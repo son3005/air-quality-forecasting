@@ -1,300 +1,104 @@
 @startmindmap
-* Phân tích chất lượng không khí & Dự báo tại TP. Cần Thơ
+*[#D4AF37] **Air Quality Forecasting Project (Cần Thơ)**
 
-** BƯỚC 1 – PHÂN TÍCH TỔNG QUAN
-*** Bài toán
-**** Time Series Forecasting
-***** Dự báo PM2.5
-***** Có thể mở rộng AQI
-**** Khu vực: TP. Cần Thơ
-**** Mục tiêu
-***** Dự báo ngắn hạn
-***** Hỗ trợ cảnh báo sớm
-***** Hỗ trợ quản lý chất lượng không khí
+** <color:#1E8449> **1. Data Collection**
+*** <color:#27AE60> 1.1. Sources
+**** Mục tiêu: Thu thập đủ dữ liệu lịch sử chất lượng không khí và thời tiết
+**** Việc cần làm: Xác định API (WeatherBit), tham số, khoảng thời gian
+**** Output: Raw data (CSV) từ API
+*** <color:#27AE60> 1.2. Crawl Strategy
+**** Mục tiêu: Thu thập tự động, đầy đủ, tránh missing block
+**** Việc cần làm: Lặp theo block 30 ngày, xử lý rate limit, lỗi
+**** Output: Script crawl hoàn chỉnh (notebook crawl-data)
+*** <color:#27AE60> 1.3. Data Validation
+**** Mục tiêu: Đảm bảo dữ liệu thu thập đủ số lượng, không bị duplicate lớn
+**** Việc cần làm: Check số lượng records, khoảng thời gian, giá trị bất thường
+**** Output: Report sơ bộ về data quality
 
-*** Input – Output
-**** Input
-***** Chất lượng không khí
-****** PM2.5
-****** PM10
-****** CO
-****** NO2
-****** O3
-****** SO2
-****** AQI
-***** Khí tượng
-****** Nhiệt độ
-****** Độ ẩm
-****** Tốc độ gió
-****** Lượng mưa
-****** Áp suất
-***** Tần suất: theo giờ
-***** Thời gian: 01/01/2023 – 01/12/2025
+** <color:#1F618D> **2. Data Preprocessing**
+*** <color:#2980B9> 2.1. Cleaning
+**** Mục tiêu: Chuẩn hóa định dạng thời gian, loại bỏ duplicate, xử lý outlier
+**** Việc cần làm: Chuyển datetime, sort, drop duplicates, filter outlier (IQR, frozen days)
+**** Output: Data đã cleaned, index là timestamp
+*** <color:#2980B9> 2.2. Missing Values
+**** Mục tiêu: Không để missing value trong khung thời gian đầy đủ
+**** Việc cần làm: Reindex to hourly, interpolation (linear, KNN), forward/backward fill
+**** Output: Data đã được nội suy, không còn missing
+*** <color:#2980B9> 2.3. Resampling
+**** Mục tiêu: Chuyển đổi tần suất dữ liệu nếu cần (hourly → daily)
+**** Việc cần làm: Resample bằng mean, sum (với mưa), áp dụng cho từng biến
+**** Output: Data ở tần suất phù hợp cho modeling
+*** <color:#2980B9> 2.4. Feature Engineering
+**** Mục tiêu: Tạo feature mới giúp mô hình học tốt hơn
+**** Việc cần làm: Biến thời gian, lag features, rolling stats, sin/cos gió
+**** Output: Dataset với feature đã engineer
 
-**** Output
-***** Dự báo PM2.5
-***** Có thể dự báo AQI
-***** Horizon
-****** 24 giờ tiếp theo
-****** 7 ngày tiếp theo
+** <color:#6C3483> **3. Exploratory Data Analysis (EDA)**
+*** <color:#8E44AD> 3.1. Univariate Analysis
+**** Mục tiêu: Hiểu phân phối của từng biến
+**** Việc cần làm: Describe, histogram, boxplot, ADF test
+**** Output: Phân phối, xu hướng, outlier
+*** <color:#8E44AD> 3.2. Multivariate Analysis
+**** Mục tiêu: Hiểu mối quan hệ giữa các biến
+**** Việc cần làm: Correlation, scatter, pairplot
+**** Output: Yếu tố ảnh hưởng PM2.5/AQI
+*** <color:#8E44AD> 3.3. Time Series Decomposition
+**** Mục tiêu: Tách trend, seasonality, noise
+**** Việc cần làm: Decomposition, ACF/PACF
+**** Output: Pattern thời gian
+*** <color:#8E44AD> 3.4. Seasonal & Trend Analysis
+**** Mục tiêu: Nhận diện mùa ô nhiễm
+**** Việc cần làm: Groupby theo giờ/ngày/tháng
+**** Output: Báo cáo EDA chi tiết
 
-*** Phạm vi
-**** Không gian
-***** TP. Cần Thơ
-***** Tọa độ: 10.047264, 105.768115
-**** Thời gian
-***** Gần 3 năm dữ liệu
+** <color:#922B21> **4. Modeling**
+*** <color:#C0392B> 4.1. Baseline Models
+**** Mục tiêu: Mốc so sánh ban đầu
+**** Việc cần làm: Mean, last value, moving average
+**** Output: MAE/RMSE baseline
+*** <color:#C0392B> 4.2. Statistical Models
+**** Mục tiêu: Mô hình thống kê
+**** Việc cần làm: ARIMA, SARIMA, SARIMAX
+**** Output: AIC, BIC, residuals
+*** <color:#C0392B> 4.3. Machine Learning
+**** Mục tiêu: Capture non-linearity
+**** Việc cần làm: RF, XGBoost, Linear Regression
+**** Output: Feature importance
+*** <color:#C0392B> 4.4. Deep Learning
+**** Mục tiêu: Sequence modeling
+**** Việc cần làm: LSTM, GRU, Transformer
+**** Output: Loss curves
+*** <color:#C0392B> 4.5. Ensemble
+**** Mục tiêu: Tăng độ chính xác
+**** Việc cần làm: Stacking, blending
+**** Output: Ensemble model
 
-*** Phân loại bài toán
-**** Forecasting
-**** Multivariate Time Series
-**** Short-term Prediction
-**** Ưu tiên cảnh báo sớm
+** <color:#AF601A> **5. Evaluation**
+*** <color:#D68910> 5.1. Validation Strategy
+**** Mục tiêu: Tránh leakage
+**** Việc cần làm: Time split, walk-forward
+**** Output: Metrics validation
+*** <color:#D68910> 5.2. Metrics
+**** Mục tiêu: Đo sai số
+**** Việc cần làm: MAE, RMSE, MAPE, R²
+**** Output: Bảng so sánh
+*** <color:#D68910> 5.3. Model Selection
+**** Mục tiêu: Chọn model deploy
+**** Việc cần làm: So sánh hiệu năng & độ phức tạp
+**** Output: Model cuối
 
-** BƯỚC 2 – MINDMAP TOÀN BỘ DỰ ÁN
-
-*** 1. Data Collection
-**** Sources
-***** Air Quality Data
-****** Weatherbit API
-***** Weather Data
-****** Weatherbit API
-
-**** Crawl Strategy
-***** Chia block 30 ngày
-***** Tránh giới hạn API
-***** Lưu raw data
-****** CSV
-****** JSON
-***** Ghi log crawl
-
-**** Data Validation
-***** Kiểm tra số bản ghi
-****** Lý thuyết: 25,561 giờ
-***** Kiểm tra phạm vi ngày
-***** Kiểm tra trường bắt buộc
-****** timestamp
-****** các chỉ số
-***** Output
-****** air_quality_raw.csv
-****** weather_hourly_raw.csv
-
-*** 2. Data Preprocessing
-**** Cleaning
-***** Loại bỏ cột không cần thiết
-****** ts
-****** datetime
-***** Chuyển kiểu timestamp
-***** Xóa bản ghi trùng lặp
-
-**** Missing Values
-***** Phát hiện missing theo thời gian
-***** Imputation
-****** MICE cho biến số
-****** Forward fill
-****** Backward fill
-***** Biến phân loại
-****** pod
-
-**** Resampling
-***** Tạo index hourly đầy đủ
-***** Xử lý khoảng trống thời gian
-***** Có thể resample daily
-
-**** Feature Engineering
-***** Biến thời gian
-****** Giờ
-****** Ngày
-****** Tháng
-****** Năm
-****** Day of week
-****** Is weekend
-***** Lag features
-***** Rolling statistics
-****** Mean 7 ngày
-****** Std 7 ngày
-***** Feature tương tác
-****** temp * humidity
-***** Fourier features
-****** Seasonality
-***** Encoding
-****** pod
-****** season
-***** Output
-****** cleaned_data.csv
-
-*** 3. Exploratory Data Analysis (EDA)
-**** Thống kê mô tả
-***** describe
-***** info
-**** Phân phối
-***** Histogram
-***** Boxplot
-**** Phân tích chuỗi thời gian
-***** Trend
-***** Seasonality
-***** Cyclic
-**** Tương quan
-***** Correlation matrix
-***** Heatmap
-**** AQI & PM2.5 theo thời gian
-**** Phân tích theo
-***** Giờ
-***** Tháng
-***** Mùa
-**** Ảnh hưởng khí tượng
-***** Scatter
-***** Line plot
-**** Outlier detection
-***** IQR
-***** Z-score
-***** Kiến thức chuyên gia
-**** Output
-***** Báo cáo EDA
-***** Insight cho feature selection
-
-*** 4. Modeling
-**** Data Split (Time-based)
-***** Train
-****** 2023-01-01 → 2025-04-30 (80%)
-***** Validation
-****** 2025-05-01 → 2025-08-31 (10%)
-***** Test
-****** 2025-09-01 → 2025-12-01 (10%)
-
-**** Feature Selection
-***** Dựa trên EDA
-***** Feature importance
-***** Loại đa cộng tuyến
-***** Phù hợp từng mô hình
-
-**** Model Selection
-***** Statistical
-****** ARIMA
-****** SARIMA
-****** SARIMAX
-***** Machine Learning
-****** XGBoost
-****** Random Forest
-****** Gradient Boosting
-***** Deep Learning
-****** LSTM
-****** GRU
-****** CNN-LSTM
-***** Hybrid models
-
-**** Hyperparameter Tuning
-***** Grid Search
-***** Random Search
-***** TimeSeriesSplit
-***** Tránh data leakage
-
-**** Training
-***** Train set
-***** Validation tuning
-***** Lưu model tốt nhất
-***** Output
-****** pkl models
-****** training logs
-****** best parameters
-
-*** 5. Evaluation
-**** Test set (unseen)
-***** Metrics
-****** MAE
-****** RMSE
-****** MAPE
-****** R-squared
-***** Visualization
-****** Actual vs Predicted
-****** Residual analysis
-***** Theo phân khúc
-****** Mùa khô
-****** Mùa mưa
-****** Giờ cao điểm
-
-**** Walk-forward validation
-**** Baseline comparison
-***** Naive forecast
-***** Mean forecast
-**** Output
-***** Báo cáo đánh giá
-***** Nhận xét ưu / nhược điểm
-
-*** 6. Forecasting
-**** Short-term forecast
-***** 7 ngày tiếp theo
-**** Model update
-***** Retrain định kỳ
-***** Online learning
-**** Cảnh báo
-***** Vượt ngưỡng an toàn
-**** Output
-***** Dự báo ngày / tuần
-***** Cảnh báo
-
-*** 7. Reporting
-**** Technical report
-**** Executive summary
-**** Slides trình bày
-**** Code repository
-***** README
-***** requirements.txt
-**** Output
-***** Báo cáo
-***** Slides
-***** Code hoàn chỉnh
-
-** BƯỚC 3 – LIÊN KẾT FILE CODE
-*** crawl-data
-**** Data Collection
-**** Thiếu validation
-**** Thiếu mô tả crawl strategy
-
-*** clean-explore-data
-**** Data Preprocessing
-**** Partial EDA
-**** Thiếu feature engineering
-**** Thiếu correlation & outlier analysis
-
-*** models
-**** Modeling
-**** Evaluation
-**** ARIMA + Walk-forward
-**** Thiếu ML/DL
-**** Thiếu tuning sâu
-
-*** Tổng kết
-**** Cover 60–70% pipeline
-**** Thiếu bước quan trọng
-**** Cần tách rõ Preprocessing – EDA – Modeling
-
-** BƯỚC 4 – WORKING PRINCIPLES
-*** Time Series Rules
-**** Giữ nguyên thứ tự thời gian
-**** Không dùng thông tin tương lai
-**** Time-based split
-
-*** Tránh Data Leakage
-**** Lag chỉ dùng quá khứ
-**** Scaling fit trên train
-**** Transform trên val/test
-
-*** Train / Val / Test
-**** 80% – 10% – 10%
-**** TimeSeriesSplit
-
-*** Logging & Reproducibility
-**** Log preprocessing
-**** Log hyperparameters
-**** Git
-**** Version dữ liệu
-**** Random seed
-
-*** Tách bạch pipeline
-**** EDA
-**** Feature Engineering
-**** Modeling
-**** Evaluation
+** <color:#117A65> **6. Forecasting**
+*** <color:#16A085> 6.1. Final Training
+**** Mục tiêu: Train full data
+**** Việc cần làm: Fit final model
+**** Output: Model production
+*** <color:#16A085> 6.2. Forecast Generation
+**** Mục tiêu: Dự báo tương lai
+**** Việc cần làm: Predict + CI
+**** Output: Bảng & chart forecast
+*** <color:#16A085> 6.3. Monitoring
+**** Mục tiêu: Theo dõi & cập nhật
+**** Việc cần làm: Log, retrain
+**** Output: Monitoring system
 
 @endmindmap
