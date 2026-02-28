@@ -2,4 +2,4 @@
 clean_data_all.csv
 
 /data/KnowAir-V2/*
-
+__pycache__
