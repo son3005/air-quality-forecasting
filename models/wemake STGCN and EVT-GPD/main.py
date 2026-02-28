@@ -166,7 +166,17 @@ def train(args):
     clean_dir = os.path.join(root, "clean")
     info_path = os.path.join(root, "info.csv")
 
-    col_map = {0: 'aqi', 1: 'pm25', 2: 'pm10', 3: 'co', 4: 'ma_pm25_24'}
+    # col_map: maps feature index → name (matches OUTPUT_SELECTED_COLS in preprocessing_clean.py)
+    col_map = {
+        0: 'aqi', 1: 'pm25', 2: 'pm10', 3: 'co', 4: 'no2', 5: 'o3',
+        6: 'temp', 7: 'rh', 8: 'dewpt', 9: 'precip', 10: 'wind_spd',
+        11: 'wind_sin', 12: 'wind_cos',
+        13: 'ah', 14: 'dpd', 15: 'is_stagnant',
+        16: 'rush_hour',
+        17: 'hour_sin', 18: 'hour_cos', 19: 'month_sin', 20: 'month_cos',
+        21: 'ma_pm25_24',
+        22: 'delta_pm25', 23: 'pm25_lag_1', 24: 'pm25_lag_24', 25: 'rain_sum_6',
+    }
     target_name = col_map.get(args.target_col_idx, 'aqi')
 
     # ---- Data ----
@@ -296,7 +306,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--epochs', type=int, default=100)
     parser.add_argument('--lr', type=float, default=0.001)
-    parser.add_argument('--target_col_idx', type=int, default=4, help='0=aqi,1=pm25,4=ma_pm25_24')
+    parser.add_argument('--target_col_idx', type=int, default=21, help='Target column index: 0=aqi, 1=pm25, 21=ma_pm25_24')
     parser.add_argument('--threshold', type=float, default=50.0, help='EVT threshold')
     parser.add_argument('--warmup', type=int, default=15, help='MSE-only warmup epochs')
     parser.add_argument('--patience', type=int, default=20, help='Early stopping patience')
