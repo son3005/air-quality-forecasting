@@ -1,0 +1,73 @@
+# ═══════════════════════════════════════════════════════════
+# Sandwich T-S-T: TimeMixer -> GCN -> Temporal Configuration
+# Mục tiêu cải thiện: MAE thấp, R2 cao, F1/Accuracy tốt
+# ═══════════════════════════════════════════════════════════
+
+model:
+  num_nodes:      12
+  seq_len:        72          # Lookback window (3 days = 72h)
+  pred_len:       12          # Forecast horizon
+  num_features:   52          # Tự động map từ DataLoader (52 hoặc 22 tùy version)
+  num_targets:    2           # Multi-target: PM2.5, AQI
+  d_model:        128         # Hidden dimension
+  d_ff:           512         # MLP expansion
+  dropout:        0.15        # Regularization để chống overfit
+
+  # --- Layer 1: TimeMixer (Khai phá chu kỳ Lịch Sử) ---
+  scales:         [1, 4, 24]  # Mượt theo giờ, 4h xu hướng buổi, 24h xu hướng ngày
+  decomp_kernel:  25          # Moving Average window (Trend/Seasonality Decomp)
+
+  # --- Layer 2: Spatial GCN (Khuếch tán không gian) ---
+  K_cheby:        3           # Bước lan truyền Chebyshev Polynomial
+  adaptive_adj:   True        # Node embedding adaptive nếu đồ thị tĩnh quá yếu
+
+# ═══════════════════════════════════════════════════════════
+
+graph:
+  method: "correlation"       # Hoạt động trơn tru với data tĩnh
+  corr_threshold: 0.3
+  distance_sigma: 200
+  distance_threshold: 500
+
+training:
+  batch_size:     32
+  epochs:         150         # Đủ để Cover WarmRestart
+  lr:             3.0e-4      # Learning rate khá nhỏ để tránh nổ GCN khi xếp lớp
+  weight_decay:   1.0e-4
+  grad_clip:      5.0
+  patience:       25          # Early stopping (thêm room cho WarmRestart)
+  T_max:          50
+  eta_min:        1.0e-6
+  warmup_epochs:  5
+
+  # Loss weight param (MultiTask Learning)
+  lambda_pm25:    0.6         # Regression
+  lambda_aqi:     0.4         # Classification
+  huber_delta:    1.0         # Chống nhiễu outlier (L1 smooth)
+
+  # Đẩy mạnh Classification loss nếu rơi vào minority
+  aqi_high_weight: 2.0
+  aqi_critical_weight: 3.0
+
+split:
+  train_end:  "2025-01-31"    # Phù hợp với v5 data
+  val_end:    "2025-06-30"
+
+provinces:
+  - AnGiang
+  - CanTho
+  - DaNang
+  - DongNai
+  - HCM
+  - HaiPhong
+  - Hanoi
+  - KhanhHoa
+  - NgheAn
+  - NinhBinh
+  - ThanhHoa
+  - VinhLong
+
+paths:
+  data:       "data/clean_data_all.csv"
+  save_dir:   "results/Sandwich_ST-TimeMixer/"
+  best_model: "results/Sandwich_ST-TimeMixer/best_model_sandwich.pt"

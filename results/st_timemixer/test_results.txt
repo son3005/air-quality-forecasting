@@ -1,0 +1,15 @@
+pm25_MAE: 8.7282
+pm25_RMSE: 15.9785
+pm25_R2: 0.3408
+pm25_sMAPE: 48.067
+aqi_MAE: 19.6648
+aqi_RMSE: 28.8066
+aqi_R2: 0.4501
+aqi_sMAPE: 29.6939
+aqi_category_accuracy: 0.6282
+aqi_category_f1_macro: 0.3432
+aqi_category_f1_weighted: 0.6184
+aqi_true_category_dist: {0: 196272, 1: 236093, 2: 66517, 3: 16732, 4: 4466, 5: 192}
+aqi_pred_category_dist: {0: 170400, 1: 289915, 2: 53274, 3: 6119, 4: 564}
+per_horizon_pm25: {'h1': {'MAE': 7.4596, 'RMSE': 13.7622}, 'h2': {'MAE': 7.7334, 'RMSE': 14.2856}, 'h3': {'MAE': 8.0525, 'RMSE': 14.8934}, 'h4': {'MAE': 8.3203, 'RMSE': 15.3519}, 'h5': {'MAE': 8.5458, 'RMSE': 15.7748}, 'h6': {'MAE': 8.7148, 'RMSE': 16.0304}, 'h7': {'MAE': 8.95, 'RMSE': 16.3651}, 'h8': {'MAE': 9.1403, 'RMSE': 16.6199}, 'h9': {'MAE': 9.2975, 'RMSE': 16.8381}, 'h10': {'MAE': 9.4156, 'RMSE': 16.9915}, 'h11': {'MAE': 9.5132, 'RMSE': 17.1197}, 'h12': {'MAE': 9.5957, 'RMSE': 17.251}}
+per_node_pm25: {'AnGiang': {'MAE': 5.1175}, 'CanTho': {'MAE': 6.0149}, 'DaNang': {'MAE': 11.077}, 'DongNai': {'MAE': 8.4096}, 'HCM': {'MAE': 7.4003}, 'HaiPhong': {'MAE': 12.5618}, 'Hanoi': {'MAE': 10.9297}, 'KhanhHoa': {'MAE': 3.0974}, 'NgheAn': {'MAE': 8.8339}, 'NinhBinh': {'MAE': 19.257}, 'ThanhHoa': {'MAE': 7.7321}, 'VinhLong': {'MAE': 4.3077}}

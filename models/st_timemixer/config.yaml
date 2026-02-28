@@ -1,0 +1,70 @@
+# ═══════════════════════════════════════════════════════════
+# ST-TimeMixer Configuration — v3 (52 features + RobustScaler)
+# ═══════════════════════════════════════════════════════════
+
+# -- Model Architecture --
+model:
+  num_nodes:      12
+  seq_len:        72          # 3 ngày lookback
+  pred_len:       12
+  num_features:   52          # Nâng từ 22 lên 52 features
+  num_targets:    2
+  d_model:        128
+  d_ff:           512
+  scales:         [1, 4, 24]
+  K_cheby:        3
+  num_gcn_layers: 3
+  dropout:        0.15
+  decomp_kernel:  25
+
+# -- Adjacency Matrix --
+graph:
+  method: "correlation"
+  corr_threshold: 0.3
+  distance_sigma: 200
+  distance_threshold: 500
+
+# -- Training --
+training:
+  batch_size:     32
+  epochs:         150
+  lr:             3.0e-4
+  weight_decay:   1.0e-4
+  grad_clip:      5.0
+  patience:       25
+  T_max:          100
+  eta_min:        1.0e-6
+  warmup_epochs:  5
+
+  lambda_pm25:    0.6
+  lambda_aqi:     0.4
+  huber_delta:    1.0
+
+  aqi_high_weight: 2.0
+  aqi_critical_weight: 3.0
+
+# -- Data Split --
+split:
+  train_end:  "2025-01-31"
+  val_end:    "2025-06-30"
+
+# -- DANH SACH TINH --
+provinces:
+  - AnGiang
+  - CanTho
+  - DaNang
+  - DongNai
+  - HCM
+  - HaiPhong
+  - Hanoi
+  - KhanhHoa
+  - NgheAn
+  - NinhBinh
+  - ThanhHoa
+  - VinhLong
+
+# -- Paths --
+paths:
+  data:     "data/clean_data_all.csv"
+  save_dir: "results/st_timemixer/"
+  best_model: "results/st_timemixer/best_model_v3.pt"
