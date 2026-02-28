@@ -1,2 +1,7 @@
 *.md
 clean_data_all.csv
+
+/data/KnowAir-V2/*
+__pycache__
+knowair_bthsa.npy
+adj_mat_knowair_bthsa.npy

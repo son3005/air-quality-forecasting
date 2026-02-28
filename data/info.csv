@@ -1,3 +1,33 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:80da38e8fad40ae528772d77f2bf8c46c06a4cac36b3e4c3acf86ab8a6b5421a
-size 1265
+station,province,district,latitude,longitude
+1,Ha Noi,Cau Giay,21.0323,105.8007
+2,Ha Noi,Thanh Xuan,20.9947,105.7998
+3,Ha Noi,Tay Ho,21.069,105.8105
+4,Ha Noi,Yen Lang,19.95,105.5
+5,Ha Noi,Gia Lam,21.0535,106.0071
+6,Ha Noi,Ba Vi,21.0833,105.3833
+7,TP.HCM,Quan 1,10.7807,106.6994
+8,TP.HCM,Quan 3,10.7749,106.6863
+9,TP.HCM,Quan Binh Thanh,10.8033,106.6967
+10,TP.HCM,Quan 10,10.7682,106.6663
+11,TP.HCM,Quan 11,10.7638,106.6436
+12,TP.HCM,Huyen Binh Chanh,10.6954,106.5913
+13,Da Nang,Thanh Khe,16.0706,108.191
+14,Da Nang,Son Tra,16.0607,108.2326
+15,Da Nang,Lien Chieu,16.0177,108.2038
+16,Hai Phong,Do Son,20.7136,106.7894
+17,Hai Phong,Hong Bang,20.8607,106.67901
+18,Can Tho,Ninh Kieu,10.0371,105.7883
+19,Can Tho,Cai Rang,10.0009,105.751
+20,Can Tho,Binh Thuy,10.0743,105.7397
+21,Khanh Hoa,Cam Ranh,11.9214,109.1591
+22,Khanh Hoa,Nha Trang,12.2451,109.1943
+23,Khanh Hoa,Dien Khanh,12.2549,109.0933
+24,Dong Nai,Bien Hoa,10.9447,106.8243
+25,Dong Nai,Long Thanh,10.7891,106.9503
+26,Dong Nai,Nhon Trach,10.7229,106.8834
+27,Nam Dinh,Nam Dinh,20.4339,106.1773
+28,Thanh Hoa,Thanh Hoa,19.8,105.7667
+29,Nghe An,Nghe An,18.6734,105.6923
+30,Vinh Long,Vinh Long,10.2537,105.9722
+31,Tra Vinh,Tra Vinh,9.9472,106.3423
+32,An Giang, Rach Gia,10.0124,105.0809
