@@ -57,13 +57,14 @@ class STGCN(nn.Module):
     def __init__(self, num_nodes, num_features, num_timesteps_input, num_timesteps_output):
         super(STGCN, self).__init__()
 
-        self.block1 = STGCNBlock(in_channels=num_features, spatial_channels=16,
-                                 out_channels=64, num_nodes=num_nodes)
-        self.block2 = STGCNBlock(in_channels=64, spatial_channels=16,
-                                 out_channels=64, num_nodes=num_nodes)
-        self.last_temporal = TimeBlock(in_channels=64, out_channels=64)
+        self.block1 = STGCNBlock(in_channels=num_features, spatial_channels=64,
+                                 out_channels=128, num_nodes=num_nodes)
+        self.block2 = STGCNBlock(in_channels=128, spatial_channels=64,
+                                 out_channels=128, num_nodes=num_nodes)
+        self.last_temporal = TimeBlock(in_channels=128, out_channels=128)
+        self.dropout = nn.Dropout(p=0.2)
 
-        self.fully_connected_1 = nn.Linear((num_timesteps_input - 10) * 64, 256)
+        self.fully_connected_1 = nn.Linear((num_timesteps_input - 10) * 128, 256)
         self.fully_connected_2 = nn.Linear(256, num_timesteps_output)
 
     def forward(self, A_hat, X):
@@ -76,7 +77,7 @@ class STGCN(nn.Module):
         batch_size, channels, num_nodes, seq_len_left = out3.shape
         out4 = out3.permute(0, 2, 1, 3).reshape(batch_size, num_nodes, channels * seq_len_left)
 
-        out5 = F.relu(self.fully_connected_1(out4))
+        out5 = self.dropout(F.relu(self.fully_connected_1(out4)))
         out6 = self.fully_connected_2(out5)
 
         return out6
