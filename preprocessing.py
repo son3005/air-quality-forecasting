@@ -38,22 +38,23 @@ WEATHER_COLUMN_MAP = {
 }
 
 # Ngưỡng vật lý để phát hiện ngoại lai — dùng tên cột sau khi rename
+# Nguồn: QCVN 05:2023, WHO AQG 2021, Open-Meteo documentation
 THRESHOLDS = {
     'aqi':            (0, 500),
-    'pm25':           (0, 600),
-    'pm10':           (0, 800),
-    'co':             (0, 30000),
-    'no2':            (0, 1000),
-    'so2':            (0, 1000),
-    'o3':             (0, 800),
-    'temp':           (5, 45),
-    'rh':             (0, 100),
-    'dewpt':          (-10, 40),
-    'apparent_temp':  (0, 55),
-    'wind_spd':       (0, 50),
-    'wind_gusts':     (0, 70),
-    'clouds':         (0, 100),
-    'precip':         (0, 200),
+    'pm25':           (0, 600),    # µg/m³ — cực đại thực tế (hazardous)
+    'pm10':           (0, 1000),   # µg/m³ — QCVN
+    'co':             (0, 20000),  # µg/m³ — QCVN 05:2023 (8h avg)
+    'no2':            (0, 400),    # µg/m³ — QCVN 05:2023
+    'so2':            (0, 500),    # µg/m³ — QCVN 06:2009
+    'o3':             (0, 350),    # µg/m³ — thực tế Việt Nam
+    'temp':           (0, 50),     # °C — phủ đầy đủ Việt Nam
+    'rh':             (0, 100),    # %
+    'dewpt':          (-5, 30),    # °C — thực tế nhiệt đới
+    'apparent_temp':  (0, 55),     # °C
+    'wind_spd':       (0, 20),     # m/s — hourly bình thường
+    'wind_gusts':     (0, 30),     # m/s — bão cấp 12
+    'clouds':         (0, 100),    # %
+    'precip':         (0, 30),     # mm/h — mưa rất lớn
 }
 
 # Các cột cần kiểm tra dữ liệu đóng băng — dùng tên cột sau khi rename
@@ -255,6 +256,103 @@ def detect_outliers(df: pd.DataFrame) -> pd.DataFrame:
 
     total_outliers = df_clean['is_outlier'].sum()
     print(f"   Tổng ngoại lai: {total_outliers:,}")
+
+    return df_clean
+
+
+# ============================================================================
+# STEP 3b: PM2.5 / PM10 SENSOR ERROR DETECTION
+# ============================================================================
+
+def detect_pm25_sensor_error(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Phát hiện và vô hiệu hóa lỗi cảm biến quang học (OPC) cho PM2.5 và PM10.
+
+    Nguyên lý:
+        PM2.5 và PM10 dùng cùng buồng đo quang học (optical particle counter).
+        Khi cảm biến bị lỗi (bụi bám, độ ẩm ngưng tụ, nhiễu điện):
+          → Cả PM2.5 và PM10 tăng đột biến ĐỒNG THỜI
+          → CO, NO2, SO2 KHÔNG tăng (không có nguồn phát thải thật)
+
+    Điều kiện để flag sensor error (phải thỏa CẢ 3):
+        1. PM2.5 > IQR fence (Q3 + 3×IQR) tính per-month
+        2. PM10 > IQR fence (Q3 + 3×IQR) tính per-month  ← xác nhận phần cứng
+        3. CO, NO2, SO2 KHÔNG tăng đột biến (pct_change tuyệt đối < 50%)
+
+    Xử lý:
+        - Set pm25 = NaN và pm10 = NaN tại các điểm bị flag
+        - Thêm cột 'is_pm25_sensor_error' (0/1) để traceable
+
+    Returns:
+        DataFrame có thêm cột 'is_pm25_sensor_error' và pm25/pm10 đã được
+        đặt về NaN tại các điểm lỗi cảm biến.
+    """
+    print(f"\n🔬 Phát Hiện Lỗi Cảm Biến OPC (PM2.5 + PM10):")
+
+    df_clean = df.copy()
+    df_clean['is_pm25_sensor_error'] = 0
+
+    if 'pm25' not in df_clean.columns or 'pm10' not in df_clean.columns:
+        print("   ⚠️  Thiếu cột pm25 hoặc pm10 — bỏ qua bước này.")
+        return df_clean
+
+    # Tính IQR fence per-month cho PM2.5 và PM10
+    # Per-month để tránh phạt nhầm mùa cao (Hà Nội đông có PM2.5 thật cao)
+    pm25_fence = pd.Series(index=df_clean.index, dtype=float)
+    pm10_fence = pd.Series(index=df_clean.index, dtype=float)
+
+    for month in range(1, 13):
+        m_idx = df_clean.index.month == month
+
+        for col, fence_series in [('pm25', pm25_fence), ('pm10', pm10_fence)]:
+            vals = df_clean.loc[m_idx, col].dropna()
+            if len(vals) < 10:
+                fence_series.loc[m_idx] = np.inf  # Không đủ dữ liệu → không flag
+                continue
+            q1 = vals.quantile(0.25)
+            q3 = vals.quantile(0.75)
+            iqr = q3 - q1
+            fence_series.loc[m_idx] = q3 + 3.0 * iqr
+
+    # Điều kiện 1: PM2.5 spike
+    pm25_spike = df_clean['pm25'] > pm25_fence
+
+    # Điều kiện 2: PM10 spike đồng thời
+    pm10_spike = df_clean['pm10'] > pm10_fence
+
+    # Điều kiện 3: CO, NO2, SO2 KHÔNG tăng đột biến
+    # Dùng pct_change — nếu cả 3 đều thay đổi < 50% → không có phát thải thật
+    gas_calm = pd.Series(True, index=df_clean.index)
+    for gas_col in ['co', 'no2', 'so2']:
+        if gas_col in df_clean.columns:
+            pct = df_clean[gas_col].pct_change().abs().fillna(0)
+            gas_calm = gas_calm & (pct < 0.5)
+
+    # Kết hợp cả 3 điều kiện
+    sensor_error_mask = pm25_spike & pm10_spike & gas_calm
+    error_count = sensor_error_mask.sum()
+
+    if error_count > 0:
+        df_clean.loc[sensor_error_mask, 'is_pm25_sensor_error'] = 1
+        # Set cả PM2.5 và PM10 về NaN → imputation xử lý
+        df_clean.loc[sensor_error_mask, 'pm25'] = np.nan
+        df_clean.loc[sensor_error_mask, 'pm10'] = np.nan
+        print(f"   ⚠️  Phát hiện {error_count:,} điểm lỗi cảm biến OPC")
+        print(f"       → Đã set pm25 và pm10 = NaN tại {error_count:,} thời điểm")
+
+        # Phân tích theo tháng để debug
+        error_by_month = (
+            df_clean[df_clean['is_pm25_sensor_error'] == 1]
+            .groupby(df_clean[df_clean['is_pm25_sensor_error'] == 1].index.month)
+            .size()
+        )
+        top_months = error_by_month.nlargest(3)
+        month_names = {1:'T1',2:'T2',3:'T3',4:'T4',5:'T5',6:'T6',
+                       7:'T7',8:'T8',9:'T9',10:'T10',11:'T11',12:'T12'}
+        top_str = ', '.join([f"{month_names.get(m,'?')}: {c}" for m, c in top_months.items()])
+        print(f"       → Tháng có nhiều lỗi nhất: {top_str}")
+    else:
+        print("   ✅ Không phát hiện lỗi cảm biến OPC")
 
     return df_clean
 
@@ -504,6 +602,61 @@ def create_weather_features(df: pd.DataFrame) -> pd.DataFrame:
     if 'no2' in df_copy.columns and 'o3' in df_copy.columns:
         df_copy['no2_o3'] = df_copy['no2'] * df_copy['o3']
 
+    # =========================================================================
+    # ENGINEERED FEATURES — AIR QUALITY INTERACTIONS
+    # =========================================================================
+
+    # Oxidation potential — O3 × (SO2 + NO2)
+    # Cao → nguy cơ oxy hóa thứ cấp, hình thành PM2.5 thứ cấp
+    if all(c in df_copy.columns for c in ['o3', 'so2', 'no2']):
+        df_copy['oxidation_potential'] = df_copy['o3'] * (df_copy['so2'] + df_copy['no2'])
+
+    # Pollution load — CO + SO2 + NO2
+    # Tổng tải ô nhiễm đốt cháy — phân biệt ngày công nghiệp vs ngày sạch
+    if all(c in df_copy.columns for c in ['co', 'so2', 'no2']):
+        df_copy['pollution_load'] = df_copy['co'] + df_copy['so2'] + df_copy['no2']
+
+    # NO2/SO2 Log-Difference — log(NO2+1) − log(SO2+1)
+    # Thay thế ratio trực tiếp vì SO2 ≈ 0 tại vùng rural → ratio → ∞ (skew = 250!)
+    # Log-difference: xem kết quả trong không gian log → có nghĩa vật lý + phân phối gần chuẩn
+    # Dương: nguồn giao thông diesel; Âm: nguồn công nghiệp/nhiệt điện
+    if all(c in df_copy.columns for c in ['no2', 'so2']):
+        df_copy['no2_so2_log_diff'] = (
+            np.log1p(df_copy['no2'].clip(lower=0))
+            - np.log1p(df_copy['so2'].clip(lower=0))
+        )
+
+    # Humid sulfate risk — RH × SO2
+    # SO2 trong môi trường ẩm → H2SO4 aerosol → tăng PM2.5 thứ cấp
+    if all(c in df_copy.columns for c in ['rh', 'so2']):
+        df_copy['humid_sulfate_risk'] = df_copy['rh'] * df_copy['so2']
+
+    # =========================================================================
+    # ENGINEERED FEATURES — METEOROLOGICAL INTERACTIONS
+    # =========================================================================
+
+    # Dew Point Spread = Temperature - Dewpoint (trùng với dpd, thêm alias)
+    # Nhỏ → gần điểm sương → sương mù, hạt bụi hút ẩm phình to
+    # (dpd đã được tính ở trên, giữ nguyên)
+
+    # Thermal Stability = Temperature - Soil Temperature (0–7cm)
+    # Dương → khí ấm hơn đất → đối lưu mạnh, phát tán ô nhiễm tốt
+    # Âm → nghịch nhiệt bề mặt → giữ ô nhiễm gần đất
+    if all(c in df_copy.columns for c in ['temp', 'soil_temp_0_7']):
+        df_copy['thermal_stability'] = df_copy['temp'] - df_copy['soil_temp_0_7']
+
+    # Stagnation Index = 1 / (Wind Speed + 1)
+    # Cao → gió yếu → ô nhiễm tích tụ; Thấp → gió mạnh → khuếch tán tốt
+    if 'wind_spd' in df_copy.columns:
+        df_copy['stagnation_index'] = 1.0 / (df_copy['wind_spd'] + 1.0)
+
+    # Dust Source Potential = Wind Speed / (Soil Moisture 0-7cm + 1)
+    # Cao → gió mạnh + đất khô → cuốn bụi cơ học (PM10 tăng)
+    if all(c in df_copy.columns for c in ['wind_spd', 'soil_moist_0_7']):
+        df_copy['dust_source_potential'] = (
+            df_copy['wind_spd'] / (df_copy['soil_moist_0_7'] + 1.0)
+        )
+
     return df_copy
 
 
@@ -731,9 +884,11 @@ def process_single_station(province: str, district: str,
     df = validate_time_range(df, location_name)
     df = detect_frozen_data(df)
     df = detect_outliers(df)
+    df = detect_pm25_sensor_error(df)   # ← Sensor error: set PM2.5+PM10=NaN trước imputation
     df = remove_duplicates(df)
     df = impute_missing_values(df, location_name)
     df = create_all_features(df, location_name)
+
 
     # Thêm cột định danh địa điểm
     df['province'] = province
