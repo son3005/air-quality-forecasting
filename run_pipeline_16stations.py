@@ -44,15 +44,15 @@ RAW_INPUT_COLS = [
     'soil_temp_0_7', 'soil_moist_0_7',
 ]
 
-# 8 Engineered features mới
+# 8 Engineered features (giu lai 6 sau khi xoa dpd va stagnation_index)
 ENGINEERED_COLS = [
-    'oxidation_potential',   # O3 × (SO2 + NO2)
+    'oxidation_potential',   # O3 x (SO2 + NO2)
     'pollution_load',        # CO + SO2 + NO2
-    'no2_so2_log_diff',      # log(NO2+1) - log(SO2+1)  — thay ratio trực tiếp (skew=250)
-    'humid_sulfate_risk',    # RH × SO2
-    'dpd',                   # Dew Point Spread = Temp - Dewpt
+    'no2_so2_log_diff',      # log(NO2+1) - log(SO2+1)
+    'humid_sulfate_risk',    # RH x SO2
+    # 'dpd' da xoa: r=-0.993 voi rh, redundant hoan toan
     'thermal_stability',     # Temp - Soil Temp (0-7cm)
-    'stagnation_index',      # 1 / (Wind Speed + 1)
+    # 'stagnation_index' da xoa: r=-0.932 voi wind_spd, r=-0.966 voi dust_source_potential
     'dust_source_potential', # Wind Speed / (Soil Moisture + 1)
 ]
 

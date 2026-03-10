@@ -24,9 +24,13 @@ CLEAN_DIR  = 'data/clean'
 OUTPUT_DIR = 'data/normalized'
 
 # Train/Val/Test split (chronological)
-TRAIN_END = '2024-09-30'   # ~70%
-VAL_END   = '2025-02-28'   # ~85%
-# Test: phần còn lại
+# Dieu chinh de dat gan 70/14/16%:
+#   TRAIN_END='2024-12-31' -> 24 thang / 35 = 68.6%
+#   VAL_END  ='2025-04-30' -> them 4 thang  -> val = 11.4%
+#   TEST     : con lai     -> 7 thang       -> test = 20%
+TRAIN_END = '2024-12-31'   # ~68.6% (tu 2024-09-30)
+VAL_END   = '2025-04-30'   # ~11.4%  (tu 2025-02-28)
+# Test: phan con lai ~20%
 
 # ─── Chiến lược per-feature ───────────────────────────────────────────────────
 
@@ -39,18 +43,23 @@ LOG_ROBUST = ['so2', 'humid_sulfate_risk']
 # Nhóm 3: Clip 99th pct → log1p → MinMaxScaler [0,1]
 CLIP_LOG_MINMAX = ['precip', 'dust_source_potential']
 
-# Nhóm 4: Clip 99th pct → RobustScaler  (no2_so2_ratio đã được thay bằng log_diff, không cần nữa)
-CLIP_ROBUST = []
+# Nhóm 4: Clip p99.5 → log1p → RobustScaler  [MO RONG]
+# pm25, pm10, no2: phan phoi heavy-tailed (skew=7-8), can log1p de nen tail
+# Clip p99.5 truoc de loai sensor error con sot (no2 max=310 la bat thuong)
+CLIP_LOG_ROBUST = ['pm25', 'pm10', 'no2']
 
-# Nhóm 5: RobustScaler
-ROBUST_ONLY = ['pm25', 'pm10', 'o3', 'no2', 'wind_spd', 'wind_gusts']
+# Nhóm 5: RobustScaler (khong co log)
+# Xoa pm25, pm10, no2 (da chuyen sang CLIP_LOG_ROBUST)
+ROBUST_ONLY = ['o3', 'wind_spd', 'wind_gusts']
 
 # Nhóm 6: StandardScaler
-STANDARD_ONLY = ['temp', 'dewpt', 'dpd', 'thermal_stability', 'soil_temp_0_7',
-                 'no2_so2_log_diff']   # log-diff đã gần Gaussian, dùng Standard
+STANDARD_ONLY = ['temp', 'dewpt', 'thermal_stability', 'soil_temp_0_7',
+                 'no2_so2_log_diff']
+# Ghi chu: 'dpd' da bi xoa khoi ENGINEERED_COLS (r=-0.993 voi rh)
 
 # Nhóm 7: MinMaxScaler [0,1]
-MINMAX_ONLY = ['rh', 'clouds', 'stagnation_index', 'soil_moist_0_7']
+# Ghi chu: 'stagnation_index' da bi xoa khoi pipeline (r=-0.932 vs wind_spd)
+MINMAX_ONLY = ['rh', 'clouds', 'soil_moist_0_7']
 
 # Nhóm 8: Cyclic encoding (sin/cos) — không cần scaler
 CYCLIC = ['wind_dir']
@@ -121,16 +130,21 @@ def normalize_station(station_id: int) -> pd.DataFrame:
         df_out[col] = _fit_transform(col, sc, df_out)
         scalers[col] = ('clip_log1p+minmax', sc, q99)
 
-    # ── Nhóm 4: Clip 99th → RobustScaler ──────────────────────────────────────
-    for col in CLIP_ROBUST:
+    # ── Nhóm 4: Clip p99.5 → log1p → RobustScaler  [CLIP_LOG_ROBUST] ─────────
+    # Danh cho: pm25, pm10, no2 — phan phoi heavy-tailed (skew=7-8 truoc fix)
+    # Buoc 1: clip p99.5 (tinh tren train) de loai extreme outlier / sensor error
+    # Buoc 2: log1p de nen tail (giam skew tu 7-8 xuong ~1-2)
+    # Buoc 3: RobustScaler de chuan hoa cuoi cung
+    for col in CLIP_LOG_ROBUST:
         if col not in df_out.columns:
             continue
-        q99 = df_out.loc[train_mask, col].quantile(0.99) if train_mask.sum() > 0 \
-              else df_out[col].quantile(0.99)
-        df_out[col] = df_out[col].clip(upper=q99)
+        # Clip threshold tinh tren tap train de tranh future leakage
+        q995 = df_out.loc[train_mask, col].quantile(0.995) if train_mask.sum() > 0 \
+               else df_out[col].quantile(0.995)
+        df_out[col] = np.log1p(df_out[col].clip(lower=0, upper=q995))
         sc = RobustScaler()
         df_out[col] = _fit_transform(col, sc, df_out)
-        scalers[col] = ('clip+robust', sc, q99)
+        scalers[col] = ('clip_p995_log1p+robust', sc, q995)
 
     # ── Nhóm 5: RobustScaler ──────────────────────────────────────────────────
     for col in ROBUST_ONLY:
