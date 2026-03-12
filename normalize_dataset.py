@@ -43,10 +43,16 @@ LOG_ROBUST = ['so2', 'humid_sulfate_risk']
 # Nhóm 3: Clip 99th pct → log1p → MinMaxScaler [0,1]
 CLIP_LOG_MINMAX = ['precip', 'dust_source_potential']
 
-# Nhóm 4: Clip p99.5 → log1p → RobustScaler  [MO RONG]
-# pm25, pm10, no2: phan phoi heavy-tailed (skew=7-8), can log1p de nen tail
-# Clip p99.5 truoc de loai sensor error con sot (no2 max=310 la bat thuong)
-CLIP_LOG_ROBUST = ['pm25', 'pm10', 'no2']
+# Nhóm 4a: log1p → RobustScaler (KHÔNG Clip) — dành cho Target Variable
+# pm25 là target chính — KHÔNG clip để model học được extreme events thật
+# (spike >150 µg/m³ mùa đông/cháy rừng là hiện tượng thật, không phải sensor error)
+# Thay thế bằng is_extreme_pm25_1h_ago (binary flag) từ preprocessing
+LOG_ROBUST_ONLY_NO_CLIP = ['pm25']
+
+# Nhóm 4b: Clip p99.5 → log1p → RobustScaler  [INPUT FEATURES]
+# pm10, no2: giữ clip để loại sensor error (chúng là input, không phải target)
+# no2 max=310 tại VN là bất thường → clip an toàn
+CLIP_LOG_ROBUST = ['pm10', 'no2']
 
 # Nhóm 5: RobustScaler (khong co log)
 # Xoa pm25, pm10, no2 (da chuyen sang CLIP_LOG_ROBUST)
@@ -66,6 +72,7 @@ CYCLIC = ['wind_dir']
 
 # Không scale: flags, metadata, timestamp
 NO_SCALE = ['is_frozen', 'is_outlier', 'is_pm25_sensor_error',
+            'is_weekend_holiday', 'is_extreme_pm25_1h_ago',  # V3 binary flags
             'station_id', 'province', 'district', 'timestamp']
 
 
@@ -130,15 +137,27 @@ def normalize_station(station_id: int) -> pd.DataFrame:
         df_out[col] = _fit_transform(col, sc, df_out)
         scalers[col] = ('clip_log1p+minmax', sc, q99)
 
-    # ── Nhóm 4: Clip p99.5 → log1p → RobustScaler  [CLIP_LOG_ROBUST] ─────────
-    # Danh cho: pm25, pm10, no2 — phan phoi heavy-tailed (skew=7-8 truoc fix)
-    # Buoc 1: clip p99.5 (tinh tren train) de loai extreme outlier / sensor error
-    # Buoc 2: log1p de nen tail (giam skew tu 7-8 xuong ~1-2)
-    # Buoc 3: RobustScaler de chuan hoa cuoi cung
+    # ── Nhóm 4a: log1p → RobustScaler — PM25 (KHÔNG Clip) ─────────────────────
+    # pm25 = target variable chính → giữ toàn bộ phân phối thật (kể cả >150 µg/m³)
+    # Chỉ log1p để nén tail + RobustScaler để chuẩn hóa
+    # Thông tin cực trị được encode riêng qua 'is_extreme_pm25_1h_ago' (binary flag)
+    for col in LOG_ROBUST_ONLY_NO_CLIP:
+        if col not in df_out.columns:
+            continue
+        df_out[col] = np.log1p(df_out[col].clip(lower=0))  # clip lower=0 chỉ để loại âm vật lý
+        sc = RobustScaler()
+        df_out[col] = _fit_transform(col, sc, df_out)
+        scalers[col] = ('log1p+robust_no_clip', sc)
+
+    # ── Nhóm 4b: Clip p99.5 → log1p → RobustScaler — Input Features ────────────
+    # pm10, no2: là input features → clip sensor error an toàn
+    # Bước 1: clip p99.5 (tính trên train) để loại extreme outlier / sensor error
+    # Bước 2: log1p để nén tail (giảm skew từ 7-8 xuống ~1-2)
+    # Bước 3: RobustScaler để chuẩn hóa cuối cùng
     for col in CLIP_LOG_ROBUST:
         if col not in df_out.columns:
             continue
-        # Clip threshold tinh tren tap train de tranh future leakage
+        # Clip threshold tính trên tập train để tránh future leakage
         q995 = df_out.loc[train_mask, col].quantile(0.995) if train_mask.sum() > 0 \
                else df_out[col].quantile(0.995)
         df_out[col] = np.log1p(df_out[col].clip(lower=0, upper=q995))

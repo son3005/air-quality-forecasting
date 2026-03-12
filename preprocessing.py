@@ -490,6 +490,39 @@ def impute_missing_values(df: pd.DataFrame, location: str) -> pd.DataFrame:
 # STEP 6: FEATURE ENGINEERING
 # ============================================================================
 
+# Danh sách ngày lễ chính thức Việt Nam 2023–2025 (theo Nghị định)
+# Nguồn: Bộ LĐ-TB&XH, cập nhật theo thực tế nghỉ bù hàng năm
+_VN_HOLIDAYS = set([
+    # ── 2023 ──────────────────────────────────────────────────
+    '2023-01-01', '2023-01-02',               # Tết Dương lịch (nghỉ bù)
+    '2023-01-20', '2023-01-21', '2023-01-22', # Tết Nguyên Đán Quý Mão
+    '2023-01-23', '2023-01-24', '2023-01-25', '2023-01-26',
+    '2023-04-29',                             # Giỗ Tổ Hùng Vương (thứ Bảy)
+    '2023-04-30', '2023-05-01', '2023-05-02', '2023-05-03',  # 30/4 + 1/5 + nghỉ bù
+    '2023-09-01', '2023-09-02', '2023-09-03', '2023-09-04',  # Quốc khánh + nghỉ bù
+
+    # ── 2024 ──────────────────────────────────────────────────
+    '2024-01-01',                             # Tết Dương lịch
+    '2024-02-08', '2024-02-09', '2024-02-10', # Tết Nguyên Đán Giáp Thìn
+    '2024-02-11', '2024-02-12', '2024-02-13', '2024-02-14',
+    '2024-04-18',                             # Giỗ Tổ Hùng Vương
+    '2024-04-27', '2024-04-28', '2024-04-29', # Ngày Chiến thắng + Quốc tế Lao động
+    '2024-04-30', '2024-05-01',
+    '2024-08-31', '2024-09-01', '2024-09-02', '2024-09-03',  # Quốc khánh + nghỉ bù
+
+    # ── 2025 ──────────────────────────────────────────────────
+    '2025-01-01',                             # Tết Dương lịch
+    '2025-01-25', '2025-01-26', '2025-01-27', # Tết Nguyên Đán Ất Tỵ
+    '2025-01-28', '2025-01-29', '2025-01-30',
+    '2025-01-31', '2025-02-01', '2025-02-02',
+    '2025-04-05', '2025-04-06', '2025-04-07', # Giỗ Tổ Hùng Vương
+    '2025-04-30', '2025-05-01', '2025-05-02', # Giải phóng miền Nam + Quốc tế Lao động
+    '2025-05-03', '2025-05-04',
+    '2025-08-30', '2025-08-31', '2025-09-01', '2025-09-02',  # Quốc khánh
+])
+_VN_HOLIDAYS_DATES = {pd.Timestamp(d).date() for d in _VN_HOLIDAYS}
+
+
 def create_time_features(df: pd.DataFrame) -> pd.DataFrame:
     """Tạo các feature theo thời gian.
 
@@ -497,6 +530,7 @@ def create_time_features(df: pd.DataFrame) -> pd.DataFrame:
         - hour, day, month, year
         - dow (day of week): 0=Mon, 6=Sun
         - is_weekend: 1 nếu Thứ 7/Chủ nhật
+        - is_weekend_holiday: 1 nếu weekend HOẶC ngày lễ chính thức VN
         - pod (Part of Day): 1=daytime (6–17h), 0=nighttime
         - rush_hour: 1 nếu 6–9h hoặc 16–19h
         - Cyclic encoding cho hour, month, dow
@@ -510,6 +544,14 @@ def create_time_features(df: pd.DataFrame) -> pd.DataFrame:
     # Day of week — quan trọng cho traffic pattern → phát thải
     df_copy['dow'] = df_copy.index.dayofweek  # 0=Mon, 6=Sun
     df_copy['is_weekend'] = (df_copy['dow'] >= 5).astype(int)
+
+    # is_weekend_holiday: weekend OR ngày lễ VN chính thức
+    # Ngày lễ → giao thông thấp hơn → phát thải khác pattern ngày thường
+    # Dùng .date() để so sánh chính xác với set ngày lễ
+    df_copy['is_weekend_holiday'] = (
+        (df_copy['is_weekend'] == 1) |
+        df_copy.index.map(lambda ts: ts.date() in _VN_HOLIDAYS_DATES)
+    ).astype(int)
 
     # pod: Part of Day — 1 = daytime (6h–17h), 0 = nighttime
     df_copy['pod'] = np.where(
@@ -756,6 +798,24 @@ def create_lag_features(df: pd.DataFrame) -> pd.DataFrame:
     if 'precip' in df_copy.columns:
         df_copy['rain_sum_6']  = df_copy['precip'].rolling(window=6, min_periods=1).sum()
         df_copy['rain_sum_24'] = df_copy['precip'].rolling(window=24, min_periods=1).sum()
+
+    # =====================================================
+    # EXTREME EVENT FLAG
+    # =====================================================
+    # is_extreme_pm25_1h_ago: = 1 nếu giờ trước PM2.5 vượt ngưỡng 75 µg/m³
+    # Ngưỡng 75 µg/m³ = WHO 24h guideline (15 µg/m³) × 5 → mức "Unhealthy" (AQI US)
+    # Mục đích: giữ lại signal spike cực đoan cho model học,
+    #           thay thế cho thông tin bị mất khi clip p99.5 trong normalize
+    # NOTE: dùng pm25_lag_1 (đã có) để tránh tính 2 lần
+    if 'pm25_lag_1' in df_copy.columns:
+        df_copy['is_extreme_pm25_1h_ago'] = (
+            df_copy['pm25_lag_1'] > 75.0
+        ).astype(int)
+    elif 'pm25' in df_copy.columns:
+        # Fallback nếu lag chưa được tính trước
+        df_copy['is_extreme_pm25_1h_ago'] = (
+            df_copy['pm25'].shift(1).bfill() > 75.0
+        ).astype(int)
 
     return df_copy
 

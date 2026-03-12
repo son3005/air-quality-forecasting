@@ -21,7 +21,8 @@ from preprocessing import (
     detect_pm25_sensor_error,
     remove_duplicates,
     impute_missing_values,
-    create_weather_features,    # chỉ dùng hàm này để tạo 8 features
+    create_weather_features,    # 6 engineered weather/pollution features
+    create_time_features,       # V3: is_weekend_holiday + cyclic time
 )
 
 # ─── Cấu hình ─────────────────────────────────────────────────────────────────
@@ -56,8 +57,10 @@ ENGINEERED_COLS = [
     'dust_source_potential', # Wind Speed / (Soil Moisture + 1)
 ]
 
-# Quality flags (giữ để traceable)
-FLAG_COLS = ['is_frozen', 'is_outlier', 'is_pm25_sensor_error']
+# Quality flags + V3 binary flags (giữ để traceable)
+FLAG_COLS = ['is_frozen', 'is_outlier', 'is_pm25_sensor_error',
+             'is_weekend_holiday',      # V3: ngay le VN chinh thuc
+             'is_extreme_pm25_1h_ago']  # V3: spike PM2.5 cuc doan
 
 # Metadata
 META_COLS = ['station_id', 'province', 'district']
@@ -107,8 +110,19 @@ def process_station(station_id: int) -> pd.DataFrame:
     df = remove_duplicates(df)
     df = impute_missing_values(df, location)
 
-    # Chỉ tạo 8 engineered features mới (không tạo lag/time/rolling)
+    # Chỉ tạo 8 engineered weather/pollution features
     df = create_weather_features(df)
+
+    # V3: Thêm is_weekend_holiday từ create_time_features()
+    # Gọi sau impute để index đã là DatetimeIndex được validate
+    df = create_time_features(df)
+
+    # V3: is_extreme_pm25_1h_ago — giữ signal spike cực đoan
+    # Ngưỡng 75 µg/m³ = WHO Unhealthy level (hourly)
+    if 'pm25' in df.columns:
+        df['is_extreme_pm25_1h_ago'] = (
+            df['pm25'].shift(1).bfill() > 75.0
+        ).astype(int)
 
     # Thêm metadata
     df['station_id'] = station_id
