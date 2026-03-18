@@ -2,161 +2,176 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import time
+import os
+import warnings
+warnings.filterwarnings('ignore')
+
 from dataset import get_dataloaders
 from graph import get_adjacency_matrix
 from model import ESTGCN
-from utils import get_metrics, print_benchmark_table
+from utils import get_metrics, inverse_transform, SELECTED_STATIONS, REGIONS
 import numpy as np
 
-class EVTLoss(nn.Module):
-    def __init__(self, threshold=1.5, penalty_weight=2.0):
-        super(EVTLoss, self).__init__()
-        self.mse = nn.MSELoss()
-        self.threshold = threshold
-        self.penalty_weight = penalty_weight
-        
-    def forward(self, y_pred, y_true):
-        mse_loss = self.mse(y_pred, y_true)
-        
-        # Pareto Peaks Penalty: focus on actual peaks, heavily penalize if model underpredicts
-        is_peak = y_true > self.threshold
-        if is_peak.sum() > 0:
-            # only penalize underprediction for extreme values
-            under_pred = torch.relu(y_true[is_peak] - y_pred[is_peak])
-            peak_penalty = torch.mean(under_pred ** 2)
-            return mse_loss + self.penalty_weight * peak_penalty
-            
-        return mse_loss
+HORIZONS = [1, 3, 6, 12, 24]
 
-def train_model(seq_len=24, pred_len=24, epochs=30, batch_size=32):
-    print("="*60)
-    print(f"Training ESTGCN - Input: {seq_len}h, Output: {pred_len}h")
-    print("="*60)
+def train_model(seq_len=48, pred_len=24, epochs=100, batch_size=64, patience=15):
+    print("="*70)
+    print(f"  S06: ESTGCN Baseline (Fair Benchmark S09)")
+    print(f"  Horizons: T+1, T+3, T+6, T+12, T+24")
+    print("="*70)
     
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print(f"Using device: {device}")
+    print(f"[*] Device: {device.type.upper()}")
     
-    # Dataloaders
-    train_loader, val_loader, test_loader = get_dataloaders(seq_len=seq_len, pred_len=pred_len, batch_size=batch_size)
+    train_loader, val_loader, test_loader, num_features = get_dataloaders(seq_len=seq_len, pred_len=pred_len, batch_size=batch_size)
     
-    # Graph
     adj = get_adjacency_matrix()
     adj = torch.tensor(adj, dtype=torch.float32).to(device)
     
-    # Model
-    num_nodes = 16
-    num_features = 26 # 26 raw features updated for ESTGCN
+    num_nodes = len(SELECTED_STATIONS)
+    print(f"[*] Features dynamic injection: {num_features}")
+    
     model = ESTGCN(num_nodes=num_nodes, num_features=num_features, seq_len=seq_len, pred_len=pred_len)
     model.to(device)
     
-    criterion = EVTLoss(threshold=1.5, penalty_weight=1.0)
-    optimizer = optim.Adam(model.parameters(), lr=1e-3) # Tweak LR for better local learning
+    criterion = nn.HuberLoss(delta=1.0)
+    optimizer = optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-4) 
+    
+    save_path = "data/models_saved/baseline_estgcn_s06.pth"
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
     
     best_val_loss = float('inf')
+    patience_counter = 0
     
+    print("[*] Bắt đầu Training...")
     for epoch in range(epochs):
-        t1 = time.time()
         model.train()
         train_loss = 0.0
         
-        for batch_idx, (x, y) in enumerate(train_loader):
-            x = x.to(device)
-            y = y.to(device)
+        for batch_data in train_loader:
+            if len(batch_data) == 3:
+                x, y, x_future = batch_data
+                x_future = x_future.to(device)
+            else:
+                x, y = batch_data
+                x_future = None
+                
+            x, y = x.to(device), y.to(device)
             
             optimizer.zero_grad()
-            out = model(x, adj)
-            
+            out = model(x, adj, x_future)
             loss = criterion(out, y)
             loss.backward()
             
-            # gradient clipping for stability with EVT loss
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
             
             optimizer.step()
-            train_loss += loss.item()
+            train_loss += loss.item() * x.size(0)
             
-        train_loss /= len(train_loader)
+        train_loss /= max(len(train_loader.dataset), 1)
         
         # Validation
         model.eval()
         val_loss = 0.0
         with torch.no_grad():
-            for x, y in val_loader:
-                x = x.to(device)
-                y = y.to(device)
+            for batch_data in val_loader:
+                if len(batch_data) == 3:
+                    x, y, x_future = batch_data
+                    x_future = x_future.to(device)
+                else:
+                    x, y = batch_data
+                    x_future = None
+                    
+                x, y = x.to(device), y.to(device)
                 
-                out = model(x, adj)
+                out = model(x, adj, x_future)
                 loss = criterion(out, y)
-                val_loss += loss.item()
+                val_loss += loss.item() * x.size(0)
                 
-        val_loss /= len(val_loader)
-        
-        t2 = time.time()
-        print(f"Epoch {epoch+1:03d} | Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f} | Time: {t2-t1:.2f}s")
+        val_loss /= max(len(val_loader.dataset), 1)
         
         if val_loss < best_val_loss:
             best_val_loss = val_loss
-            torch.save(model.state_dict(), 'best_model.pth')
-            
-    # Evaluation on Test set
-    model.load_state_dict(torch.load('best_model.pth'))
+            torch.save(model.state_dict(), save_path)
+            patience_counter = 0
+        else:
+            patience_counter += 1
+            if patience_counter >= patience:
+                break
+                
+    # ======================================================================
+    # Evaluation
+    # ======================================================================
+    model.load_state_dict(torch.load(save_path, weights_only=True))
     model.eval()
     
-    all_preds = []
-    all_targets = []
-    
+    all_preds, all_targets = [], []
     with torch.no_grad():
-        for x, y in test_loader:
+        for batch_data in test_loader:
+            if len(batch_data) == 3:
+                x, y, x_future = batch_data
+                x_future = x_future.to(device)
+            else:
+                x, y = batch_data
+                x_future = None
+                
             x = x.to(device)
-            y = y.to(device)
-            out = model(x, adj)
+            out = model(x, adj, x_future)
             
             all_preds.append(out.cpu().numpy())
-            all_targets.append(y.cpu().numpy())
+            all_targets.append(y.numpy())
             
-    all_preds = np.concatenate(all_preds, axis=0) # (samples, pred_len, num_nodes)
-    all_targets = np.concatenate(all_targets, axis=0)
+    if all_preds:
+        all_preds = np.concatenate(all_preds, axis=0) # (samples, 24, num_nodes)
+        all_targets = np.concatenate(all_targets, axis=0)
+    else:
+        all_preds = np.zeros((0, 24, num_nodes))
+        all_targets = np.zeros((0, 24, num_nodes))
+
+    all_targets_inv, all_preds_inv = inverse_transform(all_targets, all_preds)
     
-    # Calculate metrics for specific horizons
-    horizons = [1, 6, 24]
-    results = []
+    all_results = []
     
-    for h in horizons:
-        if h <= pred_len:
-            # Index is h-1
-            idx = h - 1
-            y_t = all_targets[:, idx, :]
-            y_p = all_preds[:, idx, :]
+    for r_name, sids in REGIONS.items():
+        print(f"\n[{r_name.upper()}] Processing {len(sids)} stations...")
+        
+        idx_list = [SELECTED_STATIONS.index(sid) for sid in sids]
+        region_actuals = all_targets_inv[:, :, idx_list]
+        region_preds = all_preds_inv[:, :, idx_list]
+        
+        for h in HORIZONS:
+            a_arr = region_actuals[:, h-1, :].flatten()
+            p_arr = region_preds[:, h-1, :].flatten()
             
-            mets = get_metrics(y_t, y_p)
-            mets['in_horizon'] = f't-{seq_len}h'
-            mets['out_horizon'] = f't+{h}h' # adding h notation
-            mets['hp'] = f'E: {epochs}, B: {batch_size}, L: EVT'
+            rmse, mae, r2, mape = get_metrics(a_arr, p_arr)
             
-            # Ghi chú đánh giá độ hiệu quả động
-            if h <= 2:
-                if mets['R2'] > 0.65:
-                    mets['note'] = "Bắt đỉnh xuất sắc ở ngắn hạn."
-                else:
-                    mets['note'] = "Tệ ở ngắn hạn"
-            elif h <= 6:
-                if mets['R2'] > 0.5:
-                    mets['note'] = "Vẫn giữ phân phối đỉnh khá ổn ở trung hạn."
-                else:
-                    mets['note'] = "Hiệu năng giảm mạnh ở trung hạn"
-            else:
-                # for 24h
-                if mets['R2'] > 0.3:
-                    mets['note'] = "Đạt mục tiêu Tuyệt Sát Đỉnh Cao ở dài hạn."
-                else:
-                    mets['note'] = "Giảm nhẹ nhưng tốt hơn Baseline do bảo lưu đỉnh."
-                
-            results.append(mets)
+            print(f"  [{r_name.upper()}] T+{h:<2d} | RMSE={rmse:.2f} | MAE={mae:.2f} | R2={r2*100:.2f}% | MAPE={mape:.2f}%")
             
-    print("\n\n--- TEST RESULTS ---")
-    print_benchmark_table(results)
-    
-    return results
+            all_results.append({
+                'region': r_name, 'horizon': f'T+{h}',
+                'RMSE': rmse, 'MAE': mae, 'R2': r2, 'MAPE': mape,
+                'n_test': len(a_arr)
+            })
+            
+    # Summary
+    print("\n" + "=" * 70)
+    print("  FINAL BENCHMARK — S06 ESTGCN")
+    print("=" * 70)
+    print(f"{'Region':<10} {'Horizon':<8} {'RMSE':>8} {'MAE':>8} {'R2 %':>8} {'MAPE %':>10}")
+    print("-" * 55)
+    for r in all_results:
+        print(f"{r['region']:<10} {r['horizon']:<8} {r['RMSE']:>8.2f} {r['MAE']:>8.2f} {r['R2']*100:>7.2f}% {r['MAPE']:>9.2f}%")
+
+    print("\n" + "-" * 55)
+    print("AGGREGATED (weighted by test size):")
+    for h in HORIZONS:
+        hr = [r for r in all_results if r['horizon'] == f'T+{h}']
+        if hr:
+            total = sum(r['n_test'] for r in hr)
+            agg = lambda key: sum(r[key]*r['n_test'] for r in hr) / total
+            print(f"  T+{h:<3d}  RMSE={agg('RMSE'):.2f}  MAE={agg('MAE'):.2f}  "
+                  f"R2={agg('R2')*100:.2f}%  MAPE={agg('MAPE'):.2f}%")
+    print("=" * 70)
 
 if __name__ == '__main__':
-    train_model(seq_len=24, pred_len=24, epochs=100, batch_size=64)
+    train_model(epochs=100, batch_size=256)

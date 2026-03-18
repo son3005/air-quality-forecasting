@@ -17,15 +17,13 @@ class GraphConv(nn.Module):
         return F.relu(out)
 
 class PureGCN(nn.Module):
-    def __init__(self, num_nodes, num_features):
+    def __init__(self, num_nodes, num_features, output_horizon=24):
         super(PureGCN, self).__init__()
         self.gcn1 = GraphConv(num_features, 64)
         self.gcn2 = GraphConv(64, 32)
         
-        # Max-Pooling requirement
-        # Pool across the feature dimension to aggregate
         self.pool = nn.MaxPool1d(kernel_size=2, stride=2)
-        self.fc = nn.Linear(16, 1)
+        self.fc = nn.Linear(16, output_horizon)
 
     def forward(self, x, adj):
         # x: (batch, num_nodes, num_features)
@@ -35,10 +33,10 @@ class PureGCN(nn.Module):
         b, n, c = out.shape
         out = out.reshape(b * n, c).unsqueeze(1) # (b*n, 1, c)
         
-        out = self.pool(out) # (b*n, 1, c/2)
-        out = out.squeeze(1) # (b*n, c/2)
+        out = self.pool(out) # (b*n, 1, c/2=16)
+        out = out.squeeze(1) # (b*n, 16)
         
-        out = self.fc(out) # (b*n, 1)
-        out = out.view(b, n) # (batch, num_nodes)
+        out = self.fc(out) # (b*n, 24)
+        out = out.view(b, n, -1) # (batch, num_nodes, 24)
         
         return out

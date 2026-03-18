@@ -18,7 +18,7 @@ def haversine_distance(lat1, lon1, lat2, lon2):
     distance = R * c
     return distance
 
-def get_adjacency_matrix(info_path='../../data/info.csv', selected_stations=None):
+def get_adjacency_matrix(info_path='data/info.csv', selected_stations=None):
     if selected_stations is None:
         selected_stations = [1, 3, 4, 7, 9, 12, 13, 15, 16, 17, 18, 24, 27, 29, 31, 32]
         

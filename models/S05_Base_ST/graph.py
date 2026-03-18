@@ -18,7 +18,7 @@ def haversine_distance(lat1, lon1, lat2, lon2):
     distance = R * c
     return distance
 
-def get_adjacency_matrix(info_path='../../data/info.csv', selected_stations=None):
+def get_adjacency_matrix(info_path='data/info.csv', selected_stations=None):
     if selected_stations is None:
         selected_stations = [1, 3, 4, 7, 9, 12, 13, 15, 16, 17, 18, 24, 27, 29, 31, 32]
         
@@ -56,7 +56,18 @@ def get_adjacency_matrix(info_path='../../data/info.csv', selected_stations=None
             else:
                 adj_matrix[i, j] = np.exp(- (distances[i, j] ** 2) / sigma_squared)
                 
-    return adj_matrix
+    # --- Áp dụng Sparsity & Normalized Laplacian (A_hat) ---
+    # epsilon=0.05 để giữ lại nhiều cạnh hơn cho các trạm xa (tránh mất spatial diffusion)
+    epsilon = 0.05
+    adj_matrix[adj_matrix < epsilon] = 0.0
+    
+    rowsum = np.sum(adj_matrix, axis=1)
+    d_inv_sqrt = np.power(rowsum, -0.5)
+    d_inv_sqrt[np.isinf(d_inv_sqrt)] = 0.
+    D_inv_sqrt = np.diag(d_inv_sqrt)
+    A_hat = D_inv_sqrt @ adj_matrix @ D_inv_sqrt
+                
+    return A_hat
 
 if __name__ == '__main__':
     adj = get_adjacency_matrix()

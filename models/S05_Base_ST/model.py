@@ -1,93 +1,149 @@
+import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-class GraphConv(nn.Module):
-    def __init__(self, in_channels, out_channels):
-        super(GraphConv, self).__init__()
-        self.weight = nn.Parameter(torch.FloatTensor(in_channels, out_channels))
-        self.bias = nn.Parameter(torch.FloatTensor(out_channels))
-        nn.init.xavier_uniform_(self.weight)
-        nn.init.zeros_(self.bias)
+class TimeBlock(nn.Module):
+    """
+    Temporal Convolutional Layer (1D-CNN) with Gated Linear Unit (GLU).
+    Theo Paper: P_i = (X * W_1 + b_1) ⊗ σ(X * W_2 + b_2)
+    """
+    def __init__(self, in_channels, out_channels, kernel_size=3):
+        super(TimeBlock, self).__init__()
+        
+        # Conv1d expects (batch, channels, spatial_dim, sequence_length)
+        # We will reshape our input (bat, nodes, feat, seq) -> (bat*nodes, feat, seq) for 1D conv
+        
+        # 1D Padding to keep sequence length same (if stride=1)
+        padding = (kernel_size - 1) // 2
+        
+        # 2 Convolution lines for GLU gating mechanism
+        self.conv1 = nn.Conv1d(in_channels, out_channels, kernel_size, padding=padding)
+        self.conv2 = nn.Conv1d(in_channels, out_channels, kernel_size, padding=padding)
+        
+        # Residual mapping if feature dimensions change
+        if in_channels != out_channels:
+            self.residual = nn.Conv1d(in_channels, out_channels, kernel_size=1)
+        else:
+            self.residual = nn.Identity()
 
-    def forward(self, x, adj):
-        # x: (batch, num_nodes, in_channels)
-        # adj: (num_nodes, num_nodes)
-        xW = torch.matmul(x, self.weight) # (batch, num_nodes, out_channels)
-        out = torch.matmul(adj, xW) + self.bias # Adjacency operation
+    def forward(self, X):
+        # Expected X: (batch * num_nodes, in_channels, seq_len)
+        res = self.residual(X)
+        
+        # GLU Operation
+        x1 = self.conv1(X)
+        x2 = torch.sigmoid(self.conv2(X))
+        
+        return res + (x1 * x2)
+
+class SpatialBlock(nn.Module):
+    """
+    Standard Spatial Graph Convolution logic using the Adjacency Matrix
+    Paper: Θ*x = \sum (θ_k (L^k) x) -> Reduced to 1-hop: H = σ(D^-1/2 A D^-1/2 X W)
+    """
+    def __init__(self, in_channels, out_channels, num_nodes):
+        super(SpatialBlock, self).__init__()
+        self.weight = nn.Parameter(torch.FloatTensor(in_channels, out_channels))
+        nn.init.xavier_uniform_(self.weight)
+
+    def forward(self, X, A):
+        # X: (batch, seq_len, num_nodes, in_channels)
+        # A: (num_nodes, num_nodes)
+        
+        # XW -> (bat, seq, nodes, out_channels)
+        xW = torch.matmul(X, self.weight)
+        
+        # A * XW -> Aggregate neighbors
+        out = torch.einsum('bsni,nm->bsmi', xW, A)
+        
         return F.relu(out)
 
 class STGCNBlock(nn.Module):
+    """
+    Spatio-Temporal Convolutional Block
+    Sandwich Structure: Temporal -> Spatial -> Temporal -> BatchNorm
+    """
     def __init__(self, in_channels, spatial_channels, out_channels, num_nodes):
         super(STGCNBlock, self).__init__()
-        # temporal convolution over time sequence
-        self.tconv1 = nn.Conv2d(in_channels, out_channels, kernel_size=(1, 3), padding=(0, 1))
         
-        # spatial graph convolution
-        self.gcn = GraphConv(out_channels, spatial_channels)
+        self.num_nodes = num_nodes
         
-        # temporal convolution again
-        self.tconv2 = nn.Conv2d(spatial_channels, out_channels, kernel_size=(1, 3), padding=(0, 1))
+        self.temp_conv1 = TimeBlock(in_channels, spatial_channels)
+        self.spatial_conv = SpatialBlock(spatial_channels, spatial_channels, num_nodes)
+        self.temp_conv2 = TimeBlock(spatial_channels, out_channels)
         
-        # 1x1 convolution for residual connection if dimensions differ
-        if in_channels != out_channels:
-            self.residual_conv = nn.Conv2d(in_channels, out_channels, kernel_size=(1, 1))
-        else:
-            self.residual_conv = None
-            
-        # batch norm over nodes
         self.batch_norm = nn.BatchNorm2d(num_nodes)
-
-    def forward(self, x, adj):
-        # x: (batch, in_channels, num_nodes, seq_len)
-        res = x
         
-        x = F.relu(self.tconv1(x)) # (batch, out_channels, num_nodes, seq_len)
+    def forward(self, X, A):
+        # Original Input X: (batch, seq_len, num_nodes, features)
+        b, t, n, c = X.shape
         
-        # reshape for graph convolution
-        # we iterate over seq_len dimension by folding it with batch dimension
-        b, c, n, t = x.shape
-        x_gcn = x.permute(0, 3, 2, 1).contiguous().view(b * t, n, c) 
+        # --- 1. Temporal Conv 1 ---
+        # Reshape to (batch * nodes, features, seq_len) for 1D Conv
+        x_t1 = X.permute(0, 2, 3, 1).contiguous().view(b * n, c, t)
+        x_t1 = self.temp_conv1(x_t1) # (b*n, spat_c, t)
         
-        x_gcn = self.gcn(x_gcn, adj) # (batch * seq_len, num_nodes, spatial_channels)
+        # --- 2. Spatial Conv ---
+        # Reshape back to (batch, seq_len, nodes, spat_c)
+        x_s = x_t1.view(b, n, -1, t).permute(0, 3, 1, 2).contiguous()
+        x_s = self.spatial_conv(x_s, A) # (b, t, n, spat_c)
         
-        x_gcn = x_gcn.view(b, t, n, -1).permute(0, 3, 2, 1) # (batch, spatial_channels, num_nodes, seq_len)
+        # --- 3. Temporal Conv 2 ---
+        x_t2 = x_s.permute(0, 2, 3, 1).contiguous().view(b * n, -1, t)
+        x_t2 = self.temp_conv2(x_t2) # (b*n, out_c, t)
         
-        x = F.relu(self.tconv2(x_gcn)) # (batch, out_channels, num_nodes, seq_len)
+        # --- 4. Layer Norm/BatchNorm ---
+        out = x_t2.view(b, n, -1, t).permute(0, 1, 2, 3).contiguous() # (bat, nodes, out_c, seq_len)
+        out = self.batch_norm(out)
         
-        x = x.permute(0, 2, 1, 3).contiguous() # (batch, num_nodes, out_channels, seq_len)
-        x = self.batch_norm(x)
-        x = x.permute(0, 2, 1, 3).contiguous() # (batch, out_channels, num_nodes, seq_len)
-        
-        if self.residual_conv is not None:
-            res = self.residual_conv(res)
-            
-        x = x + res
-        return F.relu(x)
+        # Return format expected for next block: (batch, seq_len, nodes, out_c)
+        out = out.permute(0, 3, 1, 2).contiguous()
+        return out
 
 class STGCN(nn.Module):
+    """
+    STGCN: Spatio-Temporal Graph Convolutional Networks (rxiv:1709.04875)
+    Architecture: ST-Conv Block x2 -> Output Layer (Temporal bottleneck -> FC)
+    """
     def __init__(self, num_nodes, num_features, seq_len, pred_len):
         super(STGCN, self).__init__()
         
-        self.stgcn_blocks = nn.ModuleList([
-            STGCNBlock(in_channels=num_features, spatial_channels=64, out_channels=32, num_nodes=num_nodes),
-            STGCNBlock(in_channels=32, spatial_channels=64, out_channels=32, num_nodes=num_nodes)
-        ])
+        self.pred_len = pred_len
+        self.num_nodes = num_nodes
         
-        # fully convolutional output to get (pred_len) from the sequence
-        self.output_conv = nn.Conv2d(32, pred_len, kernel_size=(1, seq_len))
+        # The Paper uses two ST-Conv Blocks
+        # In_Feat -> (STBlock 1) -> 64 -> 16 -> 64 -> (STBlock 2) -> 64 -> 16 -> 64
+        self.block1 = STGCNBlock(in_channels=num_features, spatial_channels=16, out_channels=64, num_nodes=num_nodes)
+        self.block2 = STGCNBlock(in_channels=64, spatial_channels=16, out_channels=64, num_nodes=num_nodes)
         
-    def forward(self, x, adj):
-        # x: (batch, seq_len, num_nodes, num_features)
-        x = x.permute(0, 3, 2, 1) # (batch, num_features, num_nodes, seq_len)
+        # Output Layer: 
+        # 1. Bottleneck Temporal Conv to reduce temporal dimension to 1 channel safely
+        self.out_temp = TimeBlock(in_channels=64, out_channels=128)
         
-        for block in self.stgcn_blocks:
-            x = block(x, adj)
-            
-        # x is (batch, out_channels=32, num_nodes, seq_len)
-        out = self.output_conv(x) # (batch, pred_len, num_nodes, 1)
-        out = out.squeeze(-1) # (batch, pred_len, num_nodes)
+        # 2. Fully connected layer over the flattened temporal dimension
+        self.fc = nn.Linear(128 * seq_len, pred_len)
+
+    def forward(self, x, adj, x_future_weather=None):
+        # x is originally (batch, seq_len, num_nodes, num_features)
         
-        # To match regular targets, permute to (batch, pred_len, num_nodes)
-        # Actually it's already there
+        # Pass through ST-Blocks
+        x_st1 = self.block1(x, adj) # (bat, seq_len, nodes, 64)
+        x_st2 = self.block2(x_st1, adj) # (bat, seq_len, nodes, 64)
+        
+        b, t, n, c = x_st2.shape
+        
+        # Reshape for Temporal Bottleneck
+        x_out = x_st2.permute(0, 2, 3, 1).contiguous().view(b * n, c, t)
+        x_out = self.out_temp(x_out) # (b*n, 128, t)
+        
+        # Flatten sequence and channel for FC
+        x_flat = x_out.view(b * n, -1) # (b*n, 128 * t)
+        
+        # Project to Future Horizons
+        out = self.fc(x_flat) # (b*n, pred_len)
+        
+        # Reshape exactly to (batch_size, pred_len, num_nodes) for Evaluation
+        out = out.view(b, n, -1).permute(0, 2, 1).contiguous()
+        
         return out
