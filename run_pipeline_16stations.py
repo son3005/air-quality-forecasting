@@ -65,12 +65,71 @@ FLAG_COLS = ['is_frozen', 'is_outlier', 'is_pm25_sensor_error',
 # Metadata
 META_COLS = ['station_id', 'province', 'district']
 
-FINAL_COLS = RAW_INPUT_COLS + ENGINEERED_COLS + FLAG_COLS + META_COLS
+# [NEW] PM2.5 Lag + Rolling + Cyclic Time features
+# Tất cả chỉ nhìn về QUÁ KHỨ (→ shift, rolling backward) → 0% data leakage
+LAG_COLS = [
+    # --- Autoregressive: PM2.5 tự tương quan cao ở mọi horizon ---
+    'pm25_lag_1',       # corr(t-1, t+1) = 0.888 - mạnh nhất trong tất cả
+    'pm25_lag_3',       # giữ thông tin xu hướng 3h gần nhất
+    'pm25_lag_6',       # corr(t-6, t+6) = 0.715 - còn rất mạnh
+    'pm25_lag_12',      # corr(t-12, t+12) = 0.634
+    'pm25_lag_24',      # corr(t-24, t+24) = 0.619 - bắt chu kỳ ngày
+    # --- Rolling stats: trào lưu (trend) và biến động (volatility) ---
+    'pm25_roll_mean_6', # trung bình 6h gần nhất - giảm nhiễu ngắn hạn
+    'pm25_roll_mean_12',# trung bình 12h - xu hướng dài hơn
+    'pm25_roll_std_6',  # độ biến động 6h - cao khi đang tăng/giảm dốc
+    # --- Cyclic time: pattern giờ (6-9h sáng peak) và tháng (muùa đông cao) ---
+    'hour_sin', 'hour_cos',   # period=24h
+    'month_sin', 'month_cos', # period=12 months
+]
+
+FINAL_COLS = RAW_INPUT_COLS + ENGINEERED_COLS + FLAG_COLS + META_COLS + LAG_COLS
 
 
 # ─── Load station info ─────────────────────────────────────────────────────────
 info_df = pd.read_csv(INFO_PATH)
 info_df = info_df[info_df['station'].isin(SELECTED_STATIONS)].set_index('station')
+
+
+# ─── Hàm tạo lag/rolling/time features cho PM2.5 ─────────────────────────────
+def create_pm25_lag_features(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Thêm Lag, Rolling và Cyclic Time features cho PM2.5.
+    Tất cả chỉ nhìn về QUÁ KHỨ → 0% data leakage.
+    
+    - pm25_lag_k: PM2.5 cách đây k tiếng (shift k)
+    - pm25_roll_mean_k: trung bình trượt k giờ (rolling backward, min_periods=1)
+    - pm25_roll_std_6: độ biến động 6h (cần min_periods=2 để tính std)
+    - hour_sin/cos, month_sin/cos: tính từ index DatetimeIndex
+    """
+    df = df.copy()
+    pm25 = df['pm25']
+    
+    # Lag features (shift: chỉ dùng giá trị QUÁ KHỨ)
+    for k in [1, 3, 6, 12, 24]:
+        df[f'pm25_lag_{k}'] = pm25.shift(k).bfill()
+    
+    # Rolling stats (min_periods đảm bảo không sinh NaN ở đầu chuỗi)
+    # Rolling BACKWARD by default (.rolling(k) nhìn [t-k+1 … t], không nhìn t+1)
+    df['pm25_roll_mean_6']  = pm25.rolling(window=6,  min_periods=1).mean()
+    df['pm25_roll_mean_12'] = pm25.rolling(window=12, min_periods=1).mean()
+    df['pm25_roll_std_6']   = pm25.rolling(window=6,  min_periods=2).std().fillna(0)
+    
+    # Cyclic Time — tính từ DatetimeIndex (đã được set trong validate_time_range)
+    if isinstance(df.index, pd.DatetimeIndex):
+        hour  = df.index.hour
+        month = df.index.month
+    else:
+        ts = pd.to_datetime(df.index)
+        hour  = ts.hour
+        month = ts.month
+    
+    df['hour_sin']  = np.sin(2 * np.pi * hour  / 24)
+    df['hour_cos']  = np.cos(2 * np.pi * hour  / 24)
+    df['month_sin'] = np.sin(2 * np.pi * month / 12)
+    df['month_cos'] = np.cos(2 * np.pi * month / 12)
+    
+    return df
 
 
 # ─── Hàm xử lý 1 trạm ────────────────────────────────────────────────────────
@@ -123,6 +182,9 @@ def process_station(station_id: int) -> pd.DataFrame:
         df['is_extreme_pm25_1h_ago'] = (
             df['pm25'].shift(1).bfill() > 75.0
         ).astype(int)
+
+    # [NEW] Lag/Rolling/Cyclic Time features cho PM2.5
+    df = create_pm25_lag_features(df)
 
     # Thêm metadata
     df['station_id'] = station_id

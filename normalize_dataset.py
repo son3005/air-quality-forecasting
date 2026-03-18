@@ -73,7 +73,16 @@ CYCLIC = ['wind_dir']
 # Không scale: flags, metadata, timestamp
 NO_SCALE = ['is_frozen', 'is_outlier', 'is_pm25_sensor_error',
             'is_weekend_holiday', 'is_extreme_pm25_1h_ago',  # V3 binary flags
-            'station_id', 'province', 'district', 'timestamp']
+            'station_id', 'province', 'district', 'timestamp',
+            # Cyclic features ∈ [-1,1] — không cần scale thêm
+            'hour_sin', 'hour_cos', 'month_sin', 'month_cos']
+
+# [NEW] PM2.5 Lag features: cùng phân phối với pm25 gốc
+# pm25 gốc được xử lý log1p+RobustScaler → lag cũng dùng cùng pipeline
+# (lag được tạo từ pm25 RAW chưa normalize, nên phải normalize riêng)
+PM25_LAG_COLS  = ['pm25_lag_1', 'pm25_lag_3', 'pm25_lag_6', 'pm25_lag_12', 'pm25_lag_24']
+PM25_ROLL_MEAN = ['pm25_roll_mean_6', 'pm25_roll_mean_12']   # cùng thành phần với pm25
+PM25_ROLL_STD  = ['pm25_roll_std_6']                         # độ biến động, không âm → RobustScaler
 
 
 # ─── Hàm chuẩn hoá 1 trạm ─────────────────────────────────────────────────────
@@ -193,6 +202,23 @@ def normalize_station(station_id: int) -> pd.DataFrame:
     df_out['split'] = 'test'
     df_out.loc[df_out.index <= TRAIN_END, 'split'] = 'train'
     df_out.loc[(df_out.index > TRAIN_END) & (df_out.index <= VAL_END), 'split'] = 'val'
+
+    # ── [NEW] Nhóm Lag PM2.5: log1p → RobustScaler (cùng chiến lược với pm25) ──
+    for col in PM25_LAG_COLS + PM25_ROLL_MEAN:
+        if col not in df_out.columns:
+            continue
+        df_out[col] = np.log1p(df_out[col].clip(lower=0))
+        sc = RobustScaler()
+        df_out[col] = _fit_transform(col, sc, df_out)
+        scalers[col] = ('log1p+robust', sc)
+    
+    # ── [NEW] Rolling Std: không có giá trị âm, RobustScaler đơn giản ──────────
+    for col in PM25_ROLL_STD:
+        if col not in df_out.columns:
+            continue
+        sc = RobustScaler()
+        df_out[col] = _fit_transform(col, sc, df_out)
+        scalers[col] = ('robust', sc)
 
     # Report
     n_train = (df_out['split'] == 'train').sum()
