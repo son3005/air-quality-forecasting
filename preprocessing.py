@@ -706,9 +706,10 @@ def create_lag_features(df: pd.DataFrame) -> pd.DataFrame:
     """Tạo lag features, rolling statistics và trend cho AQI forecasting.
 
     Bao gồm:
-        - PM2.5: lag 1/3/6/24, rolling mean/std/max/min, delta, trend 12h
+        - PM2.5: lag 1/3/6/12/24, rolling mean/std/max/min, delta, trend 12h
         - AQI: lag 1/3/6/24 (target variable)
-        - O3, NO2: lag 1/3 (pollutants phản ứng nhanh)
+        - Precursor pollutants: PM10, CO, SO2 lag 1/3/6/12/24
+        - O3, NO2: lag 1/3/6/12/24
         - Temp, Wind: lag 1/24 (weather context)
         - Precipitation: rolling sum 6h, 24h
         - Interaction: wind × pm25 (ventilation effect)
@@ -725,7 +726,7 @@ def create_lag_features(df: pd.DataFrame) -> pd.DataFrame:
     # =====================================================
     if 'pm25' in df_copy.columns:
         # Lag features
-        for lag in [1, 3, 6, 24]:
+        for lag in [1, 3, 6, 12, 24]:
             df_copy[f'pm25_lag_{lag}'] = df_copy['pm25'].shift(lag).bfill()
 
         # Delta (rate of change)
@@ -767,16 +768,31 @@ def create_lag_features(df: pd.DataFrame) -> pd.DataFrame:
         df_copy['ma_aqi_24'] = df_copy['aqi'].rolling(window=24, min_periods=1).mean()
 
     # =====================================================
-    # OTHER POLLUTANTS — LAGS
+    # PRECURSOR POLLUTANTS — LAGS (for all models)
     # =====================================================
+    # PM10: correlated with PM2.5 (cùng buồng đo OPC)
+    if 'pm10' in df_copy.columns:
+        for lag in [1, 3, 6, 12, 24]:
+            df_copy[f'pm10_lag_{lag}'] = df_copy['pm10'].shift(lag).bfill()
+
+    # CO: nguồn đốt cháy, lag dài giúp dự báo dài hạn
+    if 'co' in df_copy.columns:
+        for lag in [1, 3, 6, 12, 24]:
+            df_copy[f'co_lag_{lag}'] = df_copy['co'].shift(lag).bfill()
+
+    # SO2: nguồn công nghiệp/nhiệt điện
+    if 'so2' in df_copy.columns:
+        for lag in [1, 3, 6, 12, 24]:
+            df_copy[f'so2_lag_{lag}'] = df_copy['so2'].shift(lag).bfill()
+
     # O3: chu kỳ ngày rõ rệt (peak chiều do quang hóa)
     if 'o3' in df_copy.columns:
-        for lag in [1, 3]:
+        for lag in [1, 3, 6, 12, 24]:
             df_copy[f'o3_lag_{lag}'] = df_copy['o3'].shift(lag).bfill()
 
     # NO2: phản ứng nhanh với giao thông
     if 'no2' in df_copy.columns:
-        for lag in [1, 3]:
+        for lag in [1, 3, 6, 12, 24]:
             df_copy[f'no2_lag_{lag}'] = df_copy['no2'].shift(lag).bfill()
 
     # =====================================================
@@ -820,6 +836,32 @@ def create_lag_features(df: pd.DataFrame) -> pd.DataFrame:
     return df_copy
 
 
+def create_future_weather_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Tạo future weather features cho multi-horizon forecasting.
+
+    Ý nghĩa: Trong thực tế, dự báo thời tiết (NWP) có sẵn cho 1-48h tới.
+    Shift(-h) mô phỏng việc sử dụng dự báo thời tiết tương lai.
+
+    LƯU Ý VỀ DATA LEAKAGE:
+        - shift(-h) là forward-looking, nhưng được tính TRƯỚC khi split.
+        - Trên chuỗi thời gian liên tục, đây KHÔNG phải leak vì:
+          (1) Dữ liệu thời tiết tương lai = dự báo NWP, có sẵn trong thực tế
+          (2) Các giá trị NaN ở cuối chuỗi được fill 0 (không có forecast)
+        - Split theo block vẫn an toàn vì split xảy ra SAU tính features.
+    """
+    df_copy = df.copy()
+
+    FUTURE_COLS = ['temp', 'wind_spd', 'precip', 'rh']
+    FORECAST_HORIZONS = [1, 3, 6, 12, 24]
+
+    for col in FUTURE_COLS:
+        if col in df_copy.columns:
+            for h in FORECAST_HORIZONS:
+                df_copy[f'{col}_fut_h{h}'] = df_copy[col].shift(-h).ffill()
+
+    return df_copy
+
+
 def create_all_features(df: pd.DataFrame, location: str) -> pd.DataFrame:
     """Tạo tất cả features."""
     print(f"\n🔨 [{location}] Feature Engineering:")
@@ -829,6 +871,7 @@ def create_all_features(df: pd.DataFrame, location: str) -> pd.DataFrame:
     df = create_wind_features(df)
     df = create_weather_features(df)
     df = create_lag_features(df)
+    df = create_future_weather_features(df)
 
     new_cols = len(df.columns) - original_cols
     print(f"   Đã tạo {new_cols} features mới")

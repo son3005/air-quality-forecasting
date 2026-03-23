@@ -39,10 +39,16 @@ LR         = 5e-4
 PATIENCE   = 10
 DEVICE     = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-D_MODEL    = 128
-T_FF       = 256
-C_FF       = 256
-DROPOUT    = 0.1
+# Horizon × Region specific model size (v7)
+MODEL_CONFIG = {
+    # horizon: {region: (d_model, t_ff, c_ff)}
+    1:  {'north': (48,  96,  96),  'south': (64,  128, 128)},
+    3:  {'north': (48,  96,  96),  'south': (64,  128, 128)},
+    6:  {'north': (64,  128, 128), 'south': (96,  192, 192)},
+    12: {'north': (96,  192, 192), 'south': (96,  192, 192)},
+    24: {'north': (96,  192, 192), 'south': (128, 256, 256)},
+}
+DROPOUT    = 0.2
 
 # ══════════════════════════════════════════════════════════════════════════
 # IMPORTS
@@ -167,11 +173,8 @@ def run():
             # Adjacency
             adj = torch.tensor(get_adjacency_matrix(sids), dtype=torch.float32).to(DEVICE)
 
-            # Region-specific model size
-            if r_name == 'south':
-                _dm, _tf, _cf = 256, 512, 512
-            else:
-                _dm, _tf, _cf = D_MODEL, T_FF, C_FF
+           
+            _dm, _tf, _cf = MODEL_CONFIG[h][r_name]
 
             model = STXLinear(
                 num_nodes=num_nodes, num_features=num_features,
@@ -182,7 +185,7 @@ def run():
             n_params = sum(p.numel() for p in model.parameters())
             print(f"    Params: {n_params:,}")
 
-            optimizer = optim.AdamW(model.parameters(), lr=LR, weight_decay=1e-4)
+            optimizer = optim.AdamW(model.parameters(), lr=LR, weight_decay=5e-4)
             scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=EPOCHS, eta_min=1e-5)
             criterion = CombinedLoss()
 
