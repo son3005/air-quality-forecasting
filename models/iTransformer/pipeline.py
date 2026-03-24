@@ -31,7 +31,7 @@ REGIONS = {
 }
 PM25_COL = 'pm25'
 
-BLOCK      = 'block30'
+BLOCK      = 'block7'
 DATA_DIR   = f'data/split/{BLOCK}'
 INFO_PATH  = 'data/info.csv'
 

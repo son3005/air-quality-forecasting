@@ -29,7 +29,7 @@ PM25_COL = 'pm25'
 
 # --- Block Split Selection ---
 # Chọn 1 trong 3: 'block5', 'block7', 'block30'
-BLOCK      = 'block30'
+BLOCK      = 'block7'
 DATA_DIR   = f'data/split/{BLOCK}'
 INFO_PATH  = 'data/info.csv'
 

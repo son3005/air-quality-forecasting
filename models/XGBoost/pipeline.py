@@ -25,7 +25,7 @@ PM25_COL = 'pm25'
 
 # --- Block Split Selection ---
 # Chọn 1 trong 3: 'block5', 'block7', 'block30'
-BLOCK      = 'block7'
+BLOCK      = 'block5'
 DATA_DIR   = f'data/split/{BLOCK}'
 INFO_PATH  = 'data/info.csv'
 
@@ -199,6 +199,13 @@ def run_benchmark():
             dt = time.time() - t0
 
             y_pred_norm = model.predict(X_test)
+
+            # --- Save model checkpoint ---
+            ckpt_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'models_saved')
+            os.makedirs(ckpt_dir, exist_ok=True)
+            ckpt_path = os.path.join(ckpt_dir, f'xgboost_{r_name}_T{horizon_h}_{BLOCK}.pkl')
+            with open(ckpt_path, 'wb') as fout:
+                pickle.dump(model, fout)
 
             y_true_inv = np.zeros_like(y_test_arr)
             y_pred_inv = np.zeros_like(y_pred_norm)

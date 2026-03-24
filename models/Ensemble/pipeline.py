@@ -26,7 +26,7 @@ REGIONS = {
     'south': [7, 18, 24, 30, 31, 32],
 }
 PM25_COL = 'pm25'
-BLOCK    = 'block30'
+BLOCK    = 'block7'
 DATA_DIR = f'data/split/{BLOCK}'
 INFO_PATH = 'data/info.csv'
 HORIZONS = [1, 3, 6, 12, 24]
