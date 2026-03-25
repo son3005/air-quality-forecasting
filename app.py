@@ -192,13 +192,19 @@ st.markdown("""
     font-size: 0.75rem;
     color: rgba(148,163,184,0.6);
 }
-/* Nhãn mức AQI (Tốt / Trung bình / Không tốt...) */
+/* Nhãn mức AQI (Tốt / Trung bình / Không tốt...) – giới hạn 2 dòng */
 .forecast-label {
     font-size: 0.7rem;
     margin-top: 6px;
     font-weight: 600;
     letter-spacing: 0.05em;
     text-transform: uppercase;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    line-height: 1.35;
+    min-height: 1.9em;   /* giữ chiều cao nhất quán cho các card */
 }
 
 /* Viên nhỏ hiển thị thông tin trạm (địa danh, tọa độ) */
@@ -235,6 +241,23 @@ label, .stSelectbox label, [data-testid="stSidebarContent"] label {
     border-radius: 10px !important;
     color: #f1f5f9 !important;
 }
+/* Cho phép danh sách dropdown (menu popover) mở rộng chiều ngang 
+   để thấy đầy đủ tên dài của trạm thay vì bị cắt bởi width của sidebar */
+div[data-baseweb="popover"] > div {
+    width: max-content !important;
+    min-width: 100% !important;
+    max-width: 600px !important;
+}
+ul[data-baseweb="menu"] {
+    width: max-content !important;
+    min-width: 100% !important;
+}
+ul[data-baseweb="menu"] li {
+    white-space: nowrap !important;       /* không tự động xuống dòng */
+    overflow: visible !important;
+    text-overflow: unset !important;      /* bỏ dấu ba chấm ... */
+    padding-right: 20px !important;       /* thêm khoảng trống bên phải */
+}
 /* Ghi đè màu slider → tím */
 [data-testid="stSlider"] {
     color: #a78bfa !important;
@@ -257,6 +280,53 @@ label, .stSelectbox label, [data-testid="stSidebarContent"] label {
 /* Đường kẻ ngang phân vùng → màu trắng mờ */
 hr {
     border-color: rgba(255,255,255,0.08) !important;
+}
+/* Chỉ bỏ cursor thay đổi trên dropdown selectbox – giữ nguyên hover highlight mặc định */
+[data-baseweb="select"] [role="option"],
+[data-baseweb="menu"] [role="option"],
+[data-baseweb="popover"] li,
+[data-baseweb="select"] li,
+[data-baseweb="select"] [role="option"]:hover,
+[data-baseweb="menu"] [role="option"]:hover,
+[data-baseweb="popover"] li:hover,
+[data-baseweb="select"] li:hover {
+    cursor: default !important;
+}
+/* Station info card phía dưới */
+.station-info-card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 14px;
+    padding: 14px 16px;
+    margin-top: 4px;
+}
+.station-info-card .sta-name {
+    font-size: 1rem;
+    font-weight: 800;
+    color: #f1f5f9;
+    line-height: 1.3;
+    margin-bottom: 2px;
+}
+.station-info-card .sta-province {
+    font-size: 0.72rem;
+    color: rgba(148,163,184,0.7);
+    margin-bottom: 10px;
+}
+.station-info-card .sta-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.72rem;
+    color: rgba(148,163,184,0.65);
+    margin-bottom: 4px;
+}
+.station-info-card .sta-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    margin-top: 8px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -291,7 +361,7 @@ AVAILABLE_STATION_IDS = [1,4,5,16,17,27,7,18,24,30,31,32]
 AQI_BREAKPOINTS = [
     (0,    12,    "#34d399", "Tốt",                           "Good"),
     (12,   35.4,  "#a3e635", "Trung bình",                    "Moderate"),
-    (35.4, 55.4,  "#fbbf24", "Không tốt cho nhóm nhạy cảm",  "Unhealthy for Sensitive"),
+    (35.4, 55.4,  "#fbbf24", "Nhạy cảm",   "Unhealthy for Sensitive"),
     (55.4, 150.4, "#f97316", "Không tốt",                     "Unhealthy"),
     (150.4,250.4, "#ef4444", "Rất không tốt",                 "Very Unhealthy"),
     (250.4,500,   "#9b59b6", "Nguy hiểm",                     "Hazardous"),
@@ -379,81 +449,85 @@ def get_last_n_hours(df, n=24):
 station_info = load_station_info()  # Tải thông tin các trạm từ info.csv
 
 with st.sidebar:
-    # Logo và tên app ở đầu sidebar
+    # ── Logo ─────────────────────────────────────────────────────────
     st.markdown("""
-        <div style='text-align:center;padding: 12px 0 18px 0;'>
-            <span style='font-size:2.5rem;'>🌫️</span><br>
-            <span style='font-size:1.05rem;font-weight:800;color:#a78bfa;letter-spacing:0.04em;'>AQF Demo</span><br>
-            <span style='font-size:0.72rem;color:rgba(148,163,184,0.7);'>Air Quality Forecasting</span>
+        <div style='text-align:center;padding:16px 0 20px 0;'>
+            <div style='font-size:2.2rem;margin-bottom:4px;'>🌫️</div>
+            <div style='font-size:1.0rem;font-weight:800;color:#a78bfa;
+                        letter-spacing:0.06em;'>AQF Demo</div>
+            <div style='font-size:0.68rem;color:rgba(148,163,184,0.55);
+                        margin-top:2px;'>Air Quality Forecasting</div>
         </div>
     """, unsafe_allow_html=True)
-    st.markdown("---")
 
-    # Xây dựng dict ánh xạ: "🔵 [BẮC] Trạm 1 – Cau Giay, Ha Noi" → 1
-    # Thêm icon + nhãn cluster (BẮC/NAM) để người dùng biết trạm thuộc cluster nào
-    # và mô hình XGBoost nào sẽ được dùng để dự báo
+    # Xây dựng options: icon màu theo cluster + tên quận (hiển tỉnh qua format_func)
     station_options = {}
+    province_map    = {}
     for _, row in station_info.iterrows():
-        sid = int(row["station"])
-        if sid in CLUSTER_NORTH_APP:
-            cluster_icon = "🔵 [BẮC]"
-        elif sid in CLUSTER_SOUTH_APP:
-            cluster_icon = "🟠 [NAM]"
-        else:
-            cluster_icon = "⚪ [–]"  # trạm không có XGBoost model
-        label = f"{cluster_icon} Trạm {sid} – {row['district']}, {row['province']}"
-        station_options[label] = sid
+        sid  = int(row["station"])
+        dot  = "🔵" if sid in CLUSTER_NORTH_APP else ("🟠" if sid in CLUSTER_SOUTH_APP else "⚪")
+        lbl  = f"{dot} {row['district']}"
+        station_options[lbl] = sid
+        province_map[lbl]    = row["province"]
 
-    # Dropdown chọn trạm đo – kết quả lưu vào selected_station_id
+
+    # ── Selectbox chọn trạm ──────────────────────────────────────
+    st.markdown(
+        "<div style='font-size:0.7rem;font-weight:700;color:rgba(148,163,184,0.6);"
+        "letter-spacing:0.08em;text-transform:uppercase;margin-bottom:6px;'>📡 Trạm đo</div>",
+        unsafe_allow_html=True
+    )
     selected_label = st.selectbox(
         "Chọn trạm đo",
         options=list(station_options.keys()),
         index=0,
+        format_func=lambda lbl: f"{lbl}  —  {province_map.get(lbl, '')}",
+        label_visibility="collapsed",
     )
     selected_station_id = station_options[selected_label]
 
     # Lấy dòng thông tin tương ứng với trạm đã chọn
     selected_row = station_info[station_info["station"] == selected_station_id].iloc[0]
 
-    st.markdown("---")
-
-    # Hiển thị thông tin chi tiết của trạm: quận, tỉnh, tọa độ và cluster dự báo
-    st.markdown("<div class='metric-label'>Thông tin trạm</div>", unsafe_allow_html=True)
-    # Xác định cluster và trạng thái model
+    # ── Station info card ────────────────────────────────────────
     if selected_station_id in CLUSTER_NORTH_APP:
-        cluster_badge = "<span style='color:#60a5fa;font-weight:700;'>🔵 Cluster BẮC · XGBoost North</span>"
+        badge_bg  = "rgba(96,165,250,0.18)";  badge_clr = "#60a5fa"
+        badge_txt = "🔵 Cluster BẮC · XGBoost North"
     elif selected_station_id in CLUSTER_SOUTH_APP:
-        cluster_badge = "<span style='color:#fb923c;font-weight:700;'>🟠 Cluster NAM · XGBoost South</span>"
+        badge_bg  = "rgba(251,146,60,0.18)";  badge_clr = "#fb923c"
+        badge_txt = "🟠 Cluster NAM · XGBoost South"
     else:
-        cluster_badge = "<span style='color:#94a3b8;'>⚪ Không có model XGBoost</span>"
+        badge_bg  = "rgba(148,163,184,0.12)"; badge_clr = "#94a3b8"
+        badge_txt = "⚪ Không có model XGBoost"
+
     st.markdown(f"""
-        <span class='info-pill'>📍 {selected_row['district']}</span>
-        <span class='info-pill'>🏙 {selected_row['province']}</span><br>
-        <span class='info-pill'>🌐 {selected_row['latitude']:.4f}°N, {selected_row['longitude']:.4f}°E</span><br>
-        <div style='margin-top:8px;font-size:0.75rem;'>{cluster_badge}</div>
+    <div class="station-info-card">
+        <div class="sta-name">{selected_row['district']}</div>
+        <div class="sta-province">{selected_row['province']}</div>
+        <div class="sta-row">🌐 {selected_row['latitude']:.4f}°N &nbsp;{selected_row['longitude']:.4f}°E</div>
+        <div class="sta-row">📌 ID trạm: {selected_station_id}</div>
+        <div class="sta-badge" style="background:{badge_bg};color:{badge_clr};border:1px solid {badge_clr}55;">
+            {badge_txt}
+        </div>
+    </div>
     """, unsafe_allow_html=True)
 
-    st.markdown("---")
+    st.markdown("<div style='height:6px;'></div>", unsafe_allow_html=True)
+    st.markdown("<hr>", unsafe_allow_html=True)
 
-    # Dropdown chọn chỉ số ô nhiễm để hiển thị trên biểu đồ lịch sử (24h)
-    # Người dùng có thể đổi giữa PM2.5, PM10, CO, O3, NO2, SO2
+    # ── Chọn chỉ số pollutant ────────────────────────────────────
+    st.markdown(
+        "<div style='font-size:0.7rem;font-weight:700;color:rgba(148,163,184,0.6);"
+        "letter-spacing:0.08em;text-transform:uppercase;margin-bottom:6px;'>📊 Chỉ số lịch sử</div>",
+        unsafe_allow_html=True
+    )
     show_pollutant = st.selectbox(
         "Chỉ số hiển thị (lịch sử)",
         options=list(POLLUTANTS.keys()),
         index=0,
+        label_visibility="collapsed",
     )
-    pollutant_col = POLLUTANTS[show_pollutant]  # Tên cột CSV tương ứng
-
-    st.markdown("---")
-
-    # Mô tả ngắn về mục tiêu dự án
-    st.markdown("<div class='metric-label'>Về dự án</div>", unsafe_allow_html=True)
-    st.markdown("""
-        <div style='font-size:0.75rem;color:rgba(148,163,184,0.7);line-height:1.6;'>
-        Dự án dự báo chất lượng không khí sử dụng dữ liệu từ 16 trạm đo trên toàn quốc.
-        Mô hình dự báo PM2.5 với các mốc thời gian <b>t+1, t+6, t+12, t+24</b> giờ.
-        </div>
-    """, unsafe_allow_html=True)
+    pollutant_col = POLLUTANTS[show_pollutant]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -744,11 +818,11 @@ else:
 
 # Ánh xạ mốc giờ → (nhãn ngắn, loại dự báo) – thêm t+3h
 label_map = {
-    1:  ("t+1h",  "Ngắn hạn"),
-    3:  ("t+3h",  "Ngắn hạn"),
-    6:  ("t+6h",  "Trung ngắn"),
-    12: ("t+12h", "Trung hạn"),
-    24: ("t+24h", "Dài hạn"),
+    1:  ("Sau 1 giờ",  "Ngắn hạn"),
+    3:  ("Sau 3 giờ",  "Ngắn hạn"),
+    6:  ("Sau 6 giờ",  "Trung ngắn"),
+    12: ("Sau 12 giờ", "Trung hạn"),
+    24: ("Sau 24 giờ", "Dài hạn"),
 }
 
 # A. Radio button chọn mốc dự báo – mốc được chọn sẽ làm nổi bật thẻ tương ứng
