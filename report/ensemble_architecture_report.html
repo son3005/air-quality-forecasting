@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Ensemble Architecture Report</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true, theme:'default'});</script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400&display=swap');
+  
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  body {
+    font-family: 'Inter', sans-serif;
+    line-height: 1.7;
+    color: #1a1a2e;
+    background: #ffffff;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 40px 50px;
+  }
+  
+  h1 {
+    font-size: 28px;
+    color: #0f3460;
+    border-bottom: 3px solid #e94560;
+    padding-bottom: 12px;
+    margin-bottom: 24px;
+  }
+  
+  h2 {
+    font-size: 22px;
+    color: #16213e;
+    margin-top: 36px;
+    margin-bottom: 16px;
+    padding-left: 12px;
+    border-left: 4px solid #e94560;
+  }
+  
+  h3 {
+    font-size: 17px;
+    color: #0f3460;
+    margin-top: 24px;
+    margin-bottom: 10px;
+  }
+  
+  p { margin-bottom: 12px; }
+  
+  code {
+    font-family: 'JetBrains Mono', monospace;
+    background: #f0f0f5;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    color: #e94560;
+  }
+  
+  pre {
+    background: #1a1a2e;
+    color: #e0e0e0;
+    padding: 16px 20px;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 16px 0;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  
+  pre code {
+    background: none;
+    color: #e0e0e0;
+    padding: 0;
+  }
+  
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 14px;
+  }
+  
+  th {
+    background: #0f3460;
+    color: white;
+    padding: 10px 14px;
+    text-align: left;
+    font-weight: 600;
+  }
+  
+  td {
+    padding: 8px 14px;
+    border-bottom: 1px solid #e0e0e0;
+  }
+  
+  tr:nth-child(even) td { background: #f8f9fa; }
+  tr:hover td { background: #e8f4fd; }
+  
+  blockquote {
+    border-left: 4px solid #e94560;
+    padding: 12px 16px;
+    margin: 16px 0;
+    background: #fff3f5;
+    border-radius: 0 8px 8px 0;
+  }
+  
+  .mermaid {
+    text-align: center;
+    margin: 24px 0;
+    padding: 20px;
+    background: #fafbfc;
+    border-radius: 12px;
+    border: 1px solid #e0e0e0;
+  }
+  
+  hr {
+    border: none;
+    border-top: 2px solid #e0e0e0;
+    margin: 32px 0;
+  }
+  
+  ul, ol {
+    margin: 8px 0 16px 24px;
+  }
+  
+  li { margin-bottom: 4px; }
+  
+  strong { color: #0f3460; }
+  
+  @media print {
+    body { padding: 20px; max-width: 100%; }
+    .mermaid { page-break-inside: avoid; }
+    h2 { page-break-before: auto; }
+  }
+</style>
+</head>
+<body>
+<h1>Phân Tích Kiến Trúc Ensemble Model</h1>
+<h2>Tổng Quan</h2>
+<p><strong>Ensemble = alpha x XLinear + (1 - alpha) x ESTGCN</strong></p>
+<p>Đây là mô hình <strong>Weighted Average Ensemble</strong> — không train model mới, mà kết hợp dự đoán từ 2 model đã train sẵn (XLinear và ESTGCN) với trọng số <code>alpha</code> được tối ưu tự động trên tập validation.</p>
+<blockquote><p>Ensemble không có model riêng. Nó load checkpoint của XLinear và ESTGCN, lấy predictions ra, rồi pha trộn.</p></blockquote>
+<hr>
+<h2>Sơ Đồ Kiến Trúc</h2>
+<div class="mermaid">
+graph TD
+    subgraph Input["Dữ liệu đầu vào"]
+        D["Data Block (block5/7/30)<br/>12 trạm × N timesteps"]
+    end
+
+    subgraph Model_A["Model A: XLinear (Pre-trained)"]
+        A1["Load checkpoint:<br/>xlinear_{region}_t{h}.pth"]
+        A2["Predict trên Val set"]
+        A3["Predict trên Test set"]
+        A1 --> A2
+        A1 --> A3
+    end
+
+    subgraph Model_B["Model B: ESTGCN (Pre-trained)"]
+        B1["Load checkpoint:<br/>estgcn_baseline_{region}.pth"]
+        B2["Predict trên Val set"]
+        B3["Predict trên Test set"]
+        B1 --> B2
+        B1 --> B3
+    end
+
+    D --> A1
+    D --> B1
+
+    subgraph GridSearch["Grid Search Alpha (trên Val)"]
+        G1["alpha = 0.00, 0.01, ..., 1.00"]
+        G2["ensemble = alpha * XL_val + (1-alpha) * ES_val"]
+        G3["Tính MAE cho mỗi alpha"]
+        G4["Chọn alpha có MAE thấp nhất"]
+        G1 --> G2 --> G3 --> G4
+    end
+
+    A2 --> G1
+    B2 --> G1
+
+    subgraph FinalPred["Dự đoán cuối cùng (trên Test)"]
+        F1["ensemble_test = alpha* x XL_test + (1-alpha*) x ES_test"]
+        F2["Tính RMSE, MAE, R2, MAPE"]
+    end
+
+    G4 --> F1
+    A3 --> F1
+    B3 --> F1
+    F1 --> F2
+</div>
+<hr>
+<h2>2 Model Thành Phần</h2>
+<h3>Model A: XLinear</h3>
+<ul><li><strong>Kiến trúc:</strong> Linear projection trên trục thời gian + Gating (TGM/VGM)</li><li><strong>Đặc điểm:</strong> Nhanh, nhẹ, giỏi bắt trend tuyến tính và chu kỳ ngắn</li><li><strong>Yếu điểm:</strong> Không có cơ chế không gian → mỗi trạm dự báo độc lập</li><li><strong>Train:</strong> Riêng cho mỗi (horizon, region), <code>pred_len=1</code></li></ul>
+<h3>Model B: ESTGCN</h3>
+<ul><li><strong>Kiến trúc:</strong> GraphConv → LSTM → Dense</li><li><strong>Đặc điểm:</strong> GCN học quan hệ không gian giữa các trạm, LSTM học temporal</li><li><strong>Yếu điểm:</strong> Nặng hơn, dự báo toàn bộ 24 bước cùng lúc → không chuyên biệt từng horizon</li><li><strong>Train:</strong> 1 model duy nhất cho mỗi region, <code>pred_len=24</code></li></ul>
+<div class="mermaid">
+graph LR
+    subgraph XLinear["XLinear (Temporal Expert)"]
+        XL1["Input: (batch, 48, F)"] --> XL2["Linear(48 → d)"]
+        XL2 --> XL3["TGM + VGM Gating"]
+        XL3 --> XL4["Output: (batch, 1) — 1 horizon"]
+    end
+
+    subgraph ESTGCN["ESTGCN (Spatial-Temporal)"]
+        ES1["Input: (batch, 48, N, F)"] --> ES2["GraphConv × Adj"]
+        ES2 --> ES3["LSTM"]
+        ES3 --> ES4["Output: (batch, 24, N) — 24 horizons"]
+    end
+</div>
+<hr>
+<h2>Cơ Chế Grid Search Alpha</h2>
+<pre><code>for alpha in [0.00, 0.01, 0.02, ..., 1.00]:   # 101 giá trị
+    ensemble = alpha * XLinear_val + (1-alpha) * ESTGCN_val
+    mae = mean(|ensemble - true_val|)
+    if mae &lt; best → lưu alpha</code></pre>
+<table>
+<tr><th>Kết quả alpha</th><th>Ý nghĩa</th></tr>
+<tr><td><code>alpha ≈ 1.0</code></td><td>XLinear gần như thống trị, ESTGCN không hữu ích</td></tr>
+<tr><td><code>alpha ≈ 0.5</code></td><td>Hai model bổ trợ nhau tốt</td></tr>
+<tr><td><code>alpha ≈ 0.0</code></td><td>ESTGCN thống trị</td></tr>
+</table>
+<blockquote><p>Trong thực tế benchmark, alpha thường rất gần 1.0 (0.89 – 1.00), nghĩa là XLinear gần như luôn tốt hơn ESTGCN. Ensemble chỉ cải thiện rất nhỏ so với XLinear đơn lẻ.</p></blockquote>
+<hr>
+<h2>Pipeline Chạy</h2>
+<div class="mermaid">
+graph TD
+    A["Bắt đầu"] --> B{{"Vòng lặp: 2 Regions"}}
+    B --> C["Load ESTGCN model → predictions cho Val + Test"]
+    C --> D{{"Vòng lặp: 5 Horizons"}}
+    D --> E["Load XLinear model → predictions cho Val + Test"]
+    E --> F["Align dữ liệu (min length)"]
+    F --> G["Grid Search alpha trên Val"]
+    G --> H["Áp dụng alpha* lên Test"]
+    H --> I["In metrics: RMSE, MAE, R2, MAPE"]
+    I --> D
+    D --> J["In bảng tổng hợp FINAL BENCHMARK"]
+</div>
+<hr>
+<h2>Tóm Tắt Lý Do Thiết Kế</h2>
+<table>
+<tr><th>Quyết định</th><th>Lý do</th></tr>
+<tr><td><strong>Weighted Average (không phải stacking)</strong></td><td>Đơn giản, không cần train thêm model thứ 3, tránh overfit trên dataset nhỏ</td></tr>
+<tr><td><strong>Grid Search alpha trên Val</strong></td><td>Tìm trọng số tối ưu mà không cần gradient, tránh data leakage từ test set</td></tr>
+<tr><td><strong>Per-horizon alpha</strong></td><td>Mỗi horizon có đặc tính khác nhau — alpha có thể thay đổi (ví dụ XLinear tốt hơn ở T+1, ESTGCN có thể tốt hơn ở T+24)</td></tr>
+<tr><td><strong>XLinear + ESTGCN</strong></td><td>Kết hợp 2 "góc nhìn" bổ trợ: XLinear = temporal expert (trend, chu kỳ), ESTGCN = spatial expert (lan truyền giữa trạm)</td></tr>
+<tr><td><strong>ESTGCN pred_len=24</strong></td><td>Train 1 lần, dùng cho tất cả horizon → tiết kiệm tài nguyên. Trade-off: kém chuyên biệt</td></tr>
+<tr><td><strong>Align min length</strong></td><td>Số sample val/test có thể khác nhau giữa 2 model do cách xây dataset → cần cắt cho bằng nhau</td></tr>
+</table>
+<hr>
+<h2>Kết Luận</h2>
+<p>Ensemble là phương pháp <strong>thận trọng và an toàn</strong> — nó không bao giờ tệ hơn model tốt nhất trong 2 model thành phần (vì alpha tự điều chỉnh). Tuy nhiên, khi alpha ≈ 1.0 liên tục, điều này cho thấy ESTGCN không đóng góp đáng kể, và Ensemble gần như tương đương XLinear đơn lẻ.</p>
+</body>
+</html>
