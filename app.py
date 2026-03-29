@@ -156,16 +156,21 @@ st.markdown("""
     gap: 8px;
 }
 
-/* Thẻ dự báo từng mốc thời gian (t+1h, t+6h...) */
+/* Thẻ dự báo từng mốc thời gian */
 .forecast-card {
     background: rgba(255,255,255,0.04);
     border: 1px solid rgba(255,255,255,0.09);
     border-radius: 14px;
-    padding: 18px 20px;
+    padding: 18px 12px;
     text-align: center;
     backdrop-filter: blur(8px);
     transition: all 0.2s ease;
     cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 155px;
 }
 /* Hiệu ứng hover thẻ dự báo: viền xanh, nền nhạt */
 .forecast-card:hover {
@@ -192,19 +197,20 @@ st.markdown("""
     font-size: 0.75rem;
     color: rgba(148,163,184,0.6);
 }
-/* Nhãn mức AQI (Tốt / Trung bình / Không tốt...) – giới hạn 2 dòng */
+/* Nhãn mức AQI (Tốt / Trung bình / Không tốt...) */
 .forecast-label {
     font-size: 0.7rem;
     margin-top: 6px;
     font-weight: 600;
     letter-spacing: 0.05em;
     text-transform: uppercase;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
+    
+    /* Ép tất cả nhãn đều chiếm đúng không gian của 2 dòng (2 x 1.35em = 2.7em) */
     line-height: 1.35;
-    min-height: 1.9em;   /* giữ chiều cao nhất quán cho các card */
+    height: 2.7em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 /* Viên nhỏ hiển thị thông tin trạm (địa danh, tọa độ) */
@@ -360,11 +366,11 @@ AVAILABLE_STATION_IDS = [1,4,5,16,17,27,7,18,24,30,31,32]
 # Mỗi hàng: (giá trị thấp, giá trị cao, màu HEX, nhãn tiếng Việt, nhãn tiếng Anh)
 AQI_BREAKPOINTS = [
     (0,    12,    "#34d399", "Tốt",                           "Good"),
-    (12,   35.4,  "#a3e635", "Trung bình",                    "Moderate"),
-    (35.4, 55.4,  "#fbbf24", "Nhạy cảm",   "Unhealthy for Sensitive"),
-    (55.4, 150.4, "#f97316", "Không tốt",                     "Unhealthy"),
-    (150.4,250.4, "#ef4444", "Rất không tốt",                 "Very Unhealthy"),
-    (250.4,500,   "#9b59b6", "Nguy hiểm",                     "Hazardous"),
+    (12.1,   35.4,  "#a3e635", "Trung bình",                    "Moderate"),
+    (35.5, 55.4,  "#fbbf24", "Không tốt cho nhóm nhạy cảm",   "Unhealthy for Sensitive"),
+    (55.5, 150.4, "#f97316", "Không tốt",                     "Unhealthy"),
+    (150.5,250.4, "#ef4444", "Rất không tốt",                 "Very Unhealthy"),
+    (250.5,500,   "#9b59b6", "Nguy hiểm",                     "Hazardous"),
 ]
 
 
@@ -466,7 +472,7 @@ with st.sidebar:
     for _, row in station_info.iterrows():
         sid  = int(row["station"])
         dot  = "🔵" if sid in CLUSTER_NORTH_APP else ("🟠" if sid in CLUSTER_SOUTH_APP else "⚪")
-        lbl  = f"{dot} {row['district']}"
+        lbl  = f"{dot} Trạm {sid:02d}  · {row['district']}"
         station_options[lbl] = sid
         province_map[lbl]    = row["province"]
 
