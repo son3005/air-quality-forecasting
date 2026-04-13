@@ -171,6 +171,7 @@ def run():
     print("=" * 70)
 
     all_results = []
+    total_start = time.time()
 
     for h in HORIZONS:
         print(f"\n{'='*60}")
@@ -224,8 +225,9 @@ def run():
             # Training
             best_val = float('inf')
             patience_cnt = 0
-            save_path = f"models_saved/itransformer_{r_name}_t{h}.pth"
-            os.makedirs('models_saved', exist_ok=True)
+            save_dir = os.path.join('models_saved', BLOCK, 'iTransformer')
+            os.makedirs(save_dir, exist_ok=True)
+            save_path = os.path.join(save_dir, f'{r_name}_t{h}.pth')
 
             for epoch in range(EPOCHS):
                 t0 = time.time()
@@ -302,7 +304,7 @@ def run():
             all_results.append({
                 'region': r_name, 'horizon': f'T+{h}',
                 'RMSE': rmse, 'MAE': mae, 'R2': r2, 'MAPE': mape,
-                'n_test': len(y_true),
+                'n_test': len(y_true), 'train_time': round(time.time() - t0, 2)
             })
 
     # ══════════════════════════════════════════════════════════════════════
@@ -326,7 +328,12 @@ def run():
             w = lambda key: sum(r[key]*r['n_test'] for r in hr) / total
             print(f"  T+{h:<3d}  RMSE={w('RMSE'):.2f}  MAE={w('MAE'):.2f}  "
                   f"R2={w('R2')*100:.2f}%  MAPE={w('MAPE'):.2f}%")
+
+    total_time = time.time() - total_start
+    print(f"\n  Total training time: {total_time:.1f}s ({total_time/60:.1f}min)")
     print("=" * 70)
+
+    return all_results, total_time
 
 
 if __name__ == '__main__':

@@ -143,6 +143,7 @@ def run():
     print("=" * 70)
 
     all_results = []
+    total_start = time.time()
 
     for h in HORIZONS:
         print(f"\n{'='*60}")
@@ -189,8 +190,9 @@ def run():
             scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=EPOCHS, eta_min=1e-5)
             criterion = CombinedLoss()
 
-            save_path = f"models_saved/stxlinear_{r_name}_t{h}.pth"
-            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            save_dir = os.path.join('models_saved', BLOCK, 'STXLinear')
+            os.makedirs(save_dir, exist_ok=True)
+            save_path = os.path.join(save_dir, f'{r_name}_t{h}.pth')
 
             best_val = float('inf')
             patience_cnt = 0
@@ -260,7 +262,7 @@ def run():
             all_results.append({
                 'region': r_name, 'horizon': f'T+{h}',
                 'RMSE': rmse, 'MAE': mae, 'R2': r2, 'MAPE': mape,
-                'n_test': len(y_t)
+                'n_test': len(y_t), 'train_time': round(time.time() - t0, 2)
             })
 
     # Summary
@@ -282,7 +284,12 @@ def run():
                   f"MAE={sum(r['MAE']*r['n_test'] for r in hr)/total:.2f}  "
                   f"R2={sum(r['R2']*r['n_test'] for r in hr)/total*100:.2f}%  "
                   f"MAPE={sum(r['MAPE']*r['n_test'] for r in hr)/total:.2f}%")
+
+    total_time = time.time() - total_start
+    print(f"\n  Total training time: {total_time:.1f}s ({total_time/60:.1f}min)")
     print("=" * 70)
+
+    return all_results, total_time
 
 
 if __name__ == '__main__':

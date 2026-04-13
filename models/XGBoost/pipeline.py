@@ -35,6 +35,14 @@ EXCLUDE_COLS = ['timestamp', 'split', 'station_id', 'province', 'district']
 LAGS  = [1, 2, 3, 6, 12, 24, 36, 48, 60, 72]
 ROLLS = [3, 6, 12, 24, 48]
 
+# Các cột đã có sẵn trong normalized data mà build_features sẽ tạo lại
+# → loại khỏi cur_{col} để tránh trùng lặp trong feature matrix
+ALREADY_REBUILT = [
+    'pm25_lag_1', 'pm25_lag_3', 'pm25_lag_6', 'pm25_lag_12', 'pm25_lag_24',
+    'pm25_roll_mean_6', 'pm25_roll_mean_12', 'pm25_roll_std_6',
+    'hour_sin', 'hour_cos', 'month_sin', 'month_cos',
+]
+
 # ══════════════════════════════════════════════════════════════════════════
 # IMPORTS — Shared modules
 # ══════════════════════════════════════════════════════════════════════════
@@ -104,7 +112,10 @@ def build_features(df_raw, horizon_h, nbr_df=None, s_idx=0):
         feats['dow_cos'] = np.cos(2 * np.pi * ts.dt.dayofweek / 7)
         feats['doy_sin'] = np.sin(2 * np.pi * ts.dt.dayofyear / 365)
         feats['doy_cos'] = np.cos(2 * np.pi * ts.dt.dayofyear / 365)
-    valid_cols = [c for c in df.columns if c not in EXCLUDE_COLS and c != PM25_COL]
+    valid_cols = [c for c in df.columns
+                  if c not in EXCLUDE_COLS
+                  and c != PM25_COL
+                  and c not in ALREADY_REBUILT]
     for col in valid_cols:
         feats[f'cur_{col}'] = df[col].values
     feat_df = pd.DataFrame(feats, index=df.index)
@@ -125,6 +136,8 @@ def run_benchmark():
     print("=" * 70)
     print(f"  XGBoost Benchmark — 12 Stations | Block: {BLOCK}")
     print("=" * 70)
+
+    total_start = time.time()
 
     all_dfs, all_pm25 = {}, {}
     for s_idx, sid in enumerate(SELECTED_STATIONS):
@@ -201,9 +214,9 @@ def run_benchmark():
             y_pred_norm = model.predict(X_test)
 
             # --- Save model checkpoint ---
-            ckpt_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'models_saved')
+            ckpt_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'models_saved', BLOCK, 'XGBoost')
             os.makedirs(ckpt_dir, exist_ok=True)
-            ckpt_path = os.path.join(ckpt_dir, f'xgboost_{r_name}_T{horizon_h}_{BLOCK}.pkl')
+            ckpt_path = os.path.join(ckpt_dir, f'{r_name}_T{horizon_h}.pkl')
             with open(ckpt_path, 'wb') as fout:
                 pickle.dump(model, fout)
 
@@ -221,7 +234,7 @@ def run_benchmark():
             all_results.append({
                 'region': r_name, 'horizon': f'T+{horizon_h}',
                 'RMSE': rmse, 'MAE': mae, 'R2': r2, 'MAPE': mape,
-                'n_test': len(y_test_arr)
+                'n_test': len(y_test_arr), 'train_time': round(dt, 2)
             })
 
     print("\n" + "=" * 70)
@@ -241,7 +254,12 @@ def run_benchmark():
             agg = lambda key: sum(r[key]*r['n_test'] for r in hr) / total
             print(f"  T+{h:<3d}  RMSE={agg('RMSE'):.2f}  MAE={agg('MAE'):.2f}  "
                   f"R2={agg('R2')*100:.2f}%  MAPE={agg('MAPE'):.2f}%")
+
+    total_time = time.time() - total_start
+    print(f"\n  Total training time: {total_time:.1f}s ({total_time/60:.1f}min)")
     print("=" * 70)
+
+    return all_results, total_time
 
 
 if __name__ == '__main__':

@@ -1,0 +1,58 @@
+\chapter*{LỜI MỞ ĐẦU}
+\addcontentsline{toc}{chapter}{LỜI MỞ ĐẦU}
+
+\section{Lý do chọn đề tài}
+
+Ô nhiễm không khí đang là một trong những vấn đề môi trường cấp bách nhất tại Việt Nam hiện nay. Quá trình đô thị hóa và công nghiệp hóa diễn ra nhanh chóng đã đẩy nồng độ bụi mịn $PM_{2.5}$ tại các thành phố lớn lên mức đáng lo ngại. Nghiên cứu trên dữ liệu 10 thành phố Việt Nam giai đoạn 2013--2022 cho thấy mỗi phần trăm tăng tỷ lệ đô thị hóa kéo theo nồng độ $PM_{2.5}$ tăng thêm $0{,}54$ $\mu g/m^3$ \cite{bui2025urbanization}. Tại Hà Nội, nồng độ $PM_{2.5}$ thường xuyên vượt ngưỡng khuyến nghị $15$ $\mu g/m^3$ của Tổ chức Y tế Thế giới \cite{dam2024pm25}, trong khi phát thải giao thông được xác nhận là nguồn đóng góp chính với mức ô nhiễm biến đổi rõ rệt theo mùa \cite{ho2025assessment}. Tình trạng tương tự cũng được ghi nhận tại các vùng công nghiệp trên cả nước \cite{rti2024pollution}. Hệ quả trực tiếp của thực trạng này là tác động nghiêm trọng đến sức khỏe cộng đồng: phơi nhiễm $PM_{2.5}$ kéo dài có mối liên hệ chặt chẽ với sự gia tăng tỷ lệ mắc các bệnh lý hô hấp, tim mạch và tử vong sớm \cite{le2024environmental}, và tại Việt Nam, mỗi $1$ $\mu g/m^3$ $PM_{2.5}$ tăng thêm dẫn đến khoảng $2{,}5$ ca bệnh hô hấp bổ sung trên $1.000$ dân \cite{bui2025urbanization}. Trước thực trạng đó, việc xây dựng một hệ thống có khả năng dự báo sớm nồng độ $PM_{2.5}$ nhằm cảnh báo kịp thời cho cộng đồng và hỗ trợ cơ quan quản lý ra quyết định là nhu cầu mang tính cấp thiết.
+
+Từ góc độ chuyên môn, bài toán dự báo nồng độ $PM_{2.5}$ đặt ra nhiều thách thức kỹ thuật. Nồng độ $PM_{2.5}$ tại một trạm quan trắc không chỉ phụ thuộc vào nguồn phát thải cục bộ mà còn chịu sự chi phối mạnh mẽ của các yếu tố khí tượng như nhiệt độ, độ ẩm, hướng gió và tốc độ gió \cite{dam2024pm25}, cùng với sự lan truyền ô nhiễm từ các khu vực lân cận. Các phương pháp mô hình hóa truyền thống như CMAQ, vốn dựa trên mô phỏng quá trình vật lý--hóa học của khí quyển, đòi hỏi dữ liệu kiểm kê phát thải chi tiết và nguồn lực tính toán lớn \cite{ho2025assessment}, khiến việc triển khai dự báo liên tục trong điều kiện thực tế gặp nhiều hạn chế. Trong khi đó, các phương pháp Machine Learning và Deep Learning có khả năng khai thác trực tiếp dữ liệu quan trắc lịch sử để xây dựng mô hình dự báo với chi phí vận hành thấp hơn. Tuy nhiên, tại Việt Nam hiện nay vẫn còn thiếu các nghiên cứu so sánh đồng thời nhiều kiến trúc mô hình trên cùng tập dữ liệu đa trạm, đặc biệt là các mô hình có khả năng khai thác quan hệ không gian giữa các trạm quan trắc. Khoảng trống này là cơ sở để đồ án lựa chọn đề tài xây dựng và so sánh nhiều phương pháp dự báo $PM_{2.5}$ đa mốc thời gian, kết hợp khai thác cả đặc trưng thời gian lẫn không gian giữa các trạm quan trắc tại Việt Nam.
+
+\section{Mục tiêu nghiên cứu}
+
+Đồ án đặt ra mục tiêu tổng quát là xây dựng và đánh giá hệ thống dự báo nồng độ $PM_{2.5}$ đa mốc thời gian ($T+1, T+3, T+6, T+12, T+24$ giờ) tại Việt Nam, sử dụng kết hợp các phương pháp Machine Learning và Deep Learning trên dữ liệu đa trạm quan trắc. Để đạt được mục tiêu này, đồ án triển khai năm mục tiêu cụ thể như sau.
+
+Thứ nhất, xây dựng pipeline thu thập và tiền xử lý dữ liệu chất lượng không khí và khí tượng cho 12 trạm quan trắc (6 miền Bắc, 6 miền Nam), bao gồm các bước phát hiện lỗi cảm biến, xử lý dữ liệu đóng băng, loại bỏ ngoại lai, nội suy giá trị thiếu và chuẩn hóa đặc trưng theo từng nhóm biến. 
+
+Thứ hai, thiết kế các đặc trưng kỹ thuật dựa trên kiến thức hóa học khí quyển nhằm bổ sung thông tin có ý nghĩa vật lý cho mô hình dự báo, bao gồm các chỉ số phản ánh khả năng oxy hóa, nguy cơ hình thành aerosol sulfate, và mức độ ổn định nhiệt của khí quyển. 
+
+Thứ ba, huấn luyện và so sánh hiệu suất của sáu mô hình dự báo thuộc các kiến trúc khác nhau: XGBoost (tree-based), XLinear (linear projection), E-STGCN (graph convolution), ST-XLinear (spatio-temporal), Ensemble (kết hợp) và iTransformer (attention-based), trên cùng tập dữ liệu và cùng điều kiện đánh giá. 
+
+Thứ tư, đề xuất cơ chế Dynamic Graph --- ma trận kề thay đổi theo hướng gió thực tế, nhằm mô hình hóa sự lan truyền ô nhiễm giữa các trạm quan trắc cho các mô hình spatio-temporal. 
+
+Thứ năm, triển khai ứng dụng web demo dự báo $PM_{2.5}$ trực tuyến, cho phép người dùng tra cứu dự báo tại các trạm quan trắc, phục vụ mục đích cảnh báo ô nhiễm không khí.
+
+\section{Đối tượng và phạm vi nghiên cứu}
+
+\textbf{Đối tượng nghiên cứu} của đồ án là nồng độ bụi mịn $PM_{2.5}$ ($\mu g/m^3$) --- loại hạt có đường kính khí động học $\leq$ 2,5 $\mu m$, có khả năng thâm nhập sâu vào phế nang phổi và xâm nhập vào hệ tuần hoàn máu. Đây là chỉ số ô nhiễm không khí được quan tâm hàng đầu do mối liên hệ trực tiếp với các bệnh lý hô hấp, tim mạch và tử vong sớm \cite{le2024environmental}. Bên cạnh biến mục tiêu $PM_{2.5}$, đồ án sử dụng kết hợp hai nhóm dữ liệu đầu vào: dữ liệu chất lượng không khí ($PM_{10}, CO, NO_2, SO_2, O_3$) và dữ liệu khí tượng (nhiệt độ, độ ẩm, điểm sương, lượng mưa, tốc độ gió, hướng gió, gió giật, độ che phủ mây, nhiệt độ đất, độ ẩm đất). Sự kết hợp này xuất phát từ thực tế rằng nồng độ $PM_{2.5}$ chịu sự chi phối đồng thời của cả nguồn phát thải lẫn điều kiện khí tượng \cite{dam2024pm25}.
+
+\textbf{Phạm vi không gian} của đồ án bao gồm 12 trạm quan trắc chất lượng không khí, được chọn lọc từ mạng lưới 32 trạm ban đầu và chia thành hai cụm theo vùng địa lý: cụm miền Bắc gồm 6 trạm tại Hà Nội, Thanh Hóa, Hải Phòng và Nam Định; cụm miền Nam gồm 6 trạm tại TP. Hồ Chí Minh, Cần Thơ, Đồng Nai, Vĩnh Long, Trà Vinh và An Giang. Việc phân chia theo vùng nhằm phản ánh sự khác biệt về đặc điểm khí hậu, nguồn phát thải và mức độ biến động $PM_{2.5}$ giữa hai miền \cite{bui2025urbanization}.
+
+\textbf{Phạm vi thời gian} bao gồm dữ liệu quan trắc theo giờ từ tháng 01/2023 đến tháng 12/2025, tương đương khoảng 25.000 bản ghi mỗi trạm. Khoảng thời gian ba năm đảm bảo bao phủ đầy đủ các chu kỳ biến đổi theo mùa của $PM_{2.5}$, đặc biệt sự tương phản giữa mùa đông (nồng độ cao) và mùa hè (nồng độ thấp) tại miền Bắc Việt Nam \cite{ho2025assessment}.
+
+\textbf{Phạm vi dự báo} bao gồm năm mốc thời gian: $T+1, T+3, T+6, T+12$ và $T+24$ giờ, bao phủ từ dự báo ngắn hạn (phục vụ cảnh báo khẩn cấp) đến dự báo trung hạn (phục vụ lập kế hoạch hoạt động ngoài trời).
+
+\textbf{Giới hạn nghiên cứu}: đồ án tập trung vào dự báo giá trị nồng độ $PM_{2.5}$ dựa trên dữ liệu quan trắc mặt đất, không bao gồm dự báo các chỉ số ô nhiễm khác ($PM_{10}$, AQI tổng hợp), không sử dụng dữ liệu vệ tinh hay dữ liệu giao thông, và không thực hiện dự báo dài hạn vượt quá 24 giờ.
+
+\section{Phương pháp nghiên cứu}
+
+Đồ án áp dụng phương pháp nghiên cứu thực nghiệm, xây dựng và đánh giá các mô hình dự báo $PM_{2.5}$ theo quy trình gồm bốn giai đoạn chính: thu thập và tiền xử lý dữ liệu, thiết kế đặc trưng, xây dựng mô hình, và đánh giá hiệu suất.
+
+Ở giai đoạn đầu, dữ liệu được thu thập từ hai nguồn: dữ liệu chất lượng không khí ($PM_{2.5}$, $PM_{10}$, $CO$, $NO_2$, $SO_2$, $O_3$) từ Weatherbit API và dữ liệu khí tượng (nhiệt độ, độ ẩm, điểm sương, lượng mưa, tốc độ gió, hướng gió, gió giật, mây, nhiệt độ đất, độ ẩm đất) từ Open-Meteo API, với tần suất theo giờ tại 32 trạm quan trắc trong giai đoạn 01/2023 -- 12/2025. Hai nguồn dữ liệu được ghép nối theo dấu thời gian, sau đó trải qua quy trình tiền xử lý gồm phát hiện dữ liệu đóng băng do lỗi cảm biến quang học (OPC), phát hiện ngoại lai bằng phương pháp khoảng tứ phân vị (IQR), loại bỏ bản ghi trùng lặp, và nội suy giá trị thiếu bằng kết hợp nội suy tuyến tính và KNN. Từ 32 trạm ban đầu, 12 trạm đạt chất lượng dữ liệu được chọn lọc cho quá trình huấn luyện mô hình.
+
+Ở giai đoạn thiết kế đặc trưng, đồ án xây dựng sáu đặc trưng kỹ thuật mới dựa trên kiến thức hóa học khí quyển, phản ánh các cơ chế hình thành $PM_{2.5}$ thứ cấp và điều kiện phát tán ô nhiễm. Song song đó, các đặc trưng trễ (lag) và thống kê trượt (rolling) của $PM_{2.5}$ được bổ sung nhằm khai thác tính tự tương quan của chuỗi thời gian, cùng với mã hóa chu kỳ (sin/cos) cho các thành phần thời gian. Toàn bộ đặc trưng sau đó được chuẩn hóa theo tám chiến lược khác nhau tùy thuộc vào đặc điểm phân phối của từng nhóm biến, trong đó các bộ chuẩn hóa chỉ được khớp (fit) trên tập huấn luyện nhằm tránh rò rỉ dữ liệu. Dữ liệu được chia theo phương pháp block-based split với ba cấu hình chu kỳ 5, 7 và 30 ngày, mỗi chu kỳ gồm các phần huấn luyện, xác thực và kiểm thử liên tiếp.
+
+Ở giai đoạn xây dựng mô hình, đồ án huấn luyện và so sánh sáu mô hình thuộc các kiến trúc khác nhau: XGBoost (tree-based), XLinear (linear projection kết hợp gating mechanism), ESTGCN (graph convolution kết hợp LSTM), ST-XLinear (spatio-temporal với dynamic graph), Ensemble (kết hợp trọng số XLinear và ESTGCN), và iTransformer (inverted attention). Các mô hình được huấn luyện riêng theo từng vùng (Bắc/Nam) và từng mốc dự báo ($T+1$ đến $T+24$ giờ). Đặc biệt, đồ án đề xuất cơ chế Dynamic Graph Builder cho mô hình ST-XLinear, trong đó ma trận kề giữa các trạm thay đổi theo hướng gió thực tế, phản ánh thực tế rằng ô nhiễm lan truyền chủ yếu theo chiều gió.
+
+Ở giai đoạn đánh giá, hiệu suất các mô hình được đo bằng bốn chỉ số: RMSE, MAE, $R^2$ và MAPE, trên cả ba cấu hình block split và hai cụm vùng, nhằm đánh giá toàn diện tính chính xác và tính ổn định của từng phương pháp. Cuối cùng, mô hình có hiệu suất tốt nhất được tích hợp vào ứng dụng Streamlit, cho phép dự báo $PM_{2.5}$ trực tuyến tại 12 trạm quan trắc.
+
+\section{Cấu trúc của đồ án}
+
+Ngoài phần mở đầu và tài liệu tham khảo, nội dung chính của đồ án được trình bày trong bốn chương.
+
+\textbf{Chương 1: Tổng quan lý thuyết và cơ sở nghiên cứu} trình bày các kiến thức nền tảng liên quan đến đề tài, bao gồm tổng quan về ô nhiễm không khí và bụi mịn $PM_{2.5}$ tại Việt Nam, lý thuyết dự báo chuỗi thời gian, cơ sở lý thuyết của các mô hình Machine Learning và Deep Learning được sử dụng trong đồ án (XGBoost, XLinear, ESTGCN, ST-XLinear, iTransformer), khái niệm về mạng tích chập đồ thị (GCN) và mô hình spatio-temporal, cùng với các chỉ số đánh giá hiệu suất dự báo.
+
+\textbf{Chương 2: Phương tiện nghiên cứu -- Phương pháp nghiên cứu} mô tả chi tiết nguồn dữ liệu, mạng lưới trạm quan trắc, quy trình tiền xử lý dữ liệu gồm phát hiện lỗi cảm biến, xử lý ngoại lai và nội suy giá trị thiếu. Chương này cũng trình bày phương pháp thiết kế đặc trưng dựa trên kiến thức hóa học khí quyển, chiến lược chuẩn hóa theo nhóm biến, cách chia dữ liệu theo phương pháp block-based split, kiến trúc chi tiết của sáu mô hình dự báo, và cơ chế Dynamic Graph Builder.
+
+\textbf{Chương 3: Kết quả và thảo luận} trình bày kết quả thí nghiệm so sánh hiệu suất của sáu mô hình trên năm mốc dự báo ($T+1, T+3, T+6, T+12, T+24$ giờ), phân tích sự khác biệt hiệu suất giữa cụm trạm miền Bắc và miền Nam, đánh giá tính ổn định qua ba cấu hình chia dữ liệu, và thảo luận về nguyên nhân dẫn đến ưu thế của mô hình tốt nhất so với các phương pháp còn lại.
+
+\textbf{Chương 4: Kết luận và đề xuất} tổng kết các kết quả đạt được của đồ án, nêu rõ những hạn chế còn tồn tại, và đề xuất các hướng phát triển trong tương lai nhằm cải thiện độ chính xác dự báo cũng như khả năng ứng dụng thực tế của hệ thống.

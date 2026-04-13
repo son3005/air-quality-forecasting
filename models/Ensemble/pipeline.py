@@ -8,6 +8,7 @@ Ensemble: α × XLinear + (1-α) × ESTGCN
 """
 import os
 import sys
+import time
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -111,7 +112,7 @@ def get_estgcn_predictions(sids, r_name, split_name):
                    seq_len=SEQ_LEN, pred_len=24)
     model.to(DEVICE)
 
-    save_path = f"models_saved/estgcn_baseline_{r_name}.pth"
+    save_path = os.path.join('models_saved', BLOCK, 'ESTGCN', f'baseline_{r_name}.pth')
     model.load_state_dict(torch.load(save_path, weights_only=True, map_location=DEVICE))
     model.eval()
 
@@ -308,7 +309,7 @@ def get_xlinear_predictions(region_sids, r_name, horizon_h, split_name):
     cfg = xlinear_config(num_features, r_name)
     model = XLinearModel(cfg).to(DEVICE)
 
-    save_path = f"models_saved/xlinear_{r_name}_t{horizon_h}.pth"
+    save_path = os.path.join('models_saved', BLOCK, 'XLinear', f'{r_name}_t{horizon_h}.pth')
     model.load_state_dict(torch.load(save_path, weights_only=True, map_location=DEVICE))
     model.eval()
 
@@ -356,6 +357,7 @@ def run():
     print("=" * 70)
 
     all_results = []
+    total_start = time.time()
 
     for r_name, sids in REGIONS.items():
         print(f"\n{'='*60}")
@@ -414,6 +416,7 @@ def run():
                 'region': r_name, 'horizon': f'T+{h}',
                 'RMSE': rmse, 'MAE': mae, 'R2': r2, 'MAPE': mape,
                 'alpha': best_alpha, 'n_test': n_test,
+                'train_time': round(time.time() - total_start, 2),
                 'MAE_xl': mae_xl, 'R2_xl': r2_xl,
                 'MAE_es': mae_es, 'R2_es': r2_es,
             })
@@ -442,7 +445,18 @@ def run():
             print(f"  T+{h:<3d}  α={avg_alpha:.2f}  "
                   f"RMSE={w('RMSE'):.2f}  MAE={w('MAE'):.2f}  "
                   f"R²={w('R2')*100:.2f}%  MAPE={w('MAPE'):.2f}%")
+
+    total_time = time.time() - total_start
+    print(f"\n  Total time: {total_time:.1f}s ({total_time/60:.1f}min)")
     print("=" * 70)
+
+    import json
+    save_dir = os.path.join('models_saved', BLOCK, 'Ensemble')
+    os.makedirs(save_dir, exist_ok=True)
+    with open(os.path.join(save_dir, 'alpha_weights.json'), 'w', encoding='utf-8') as f:
+        json.dump(all_results, f, indent=2, ensure_ascii=False)
+
+    return all_results, total_time
 
 
 if __name__ == '__main__':

@@ -166,6 +166,7 @@ def train_model(seq_len=SEQ_LEN, pred_len=PRED_LEN, epochs=EPOCHS, batch_size=BA
     print("=" * 70)
 
     all_results = []
+    total_start = time.time()
 
     for r_name, sids in REGIONS.items():
         print(f"\n[{r_name.upper()}] Training {len(sids)} stations...")
@@ -185,8 +186,9 @@ def train_model(seq_len=SEQ_LEN, pred_len=PRED_LEN, epochs=EPOCHS, batch_size=BA
         criterion = nn.HuberLoss(delta=1.0)
         optimizer = optim.AdamW(model.parameters(), lr=LR, weight_decay=1e-4)
 
-        save_path = f"models_saved/estgcn_baseline_{r_name}.pth"
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        save_dir = os.path.join('models_saved', BLOCK, 'ESTGCN')
+        os.makedirs(save_dir, exist_ok=True)
+        save_path = os.path.join(save_dir, f'baseline_{r_name}.pth')
 
         best_val_loss = float('inf')
         patience_counter = 0
@@ -266,7 +268,7 @@ def train_model(seq_len=SEQ_LEN, pred_len=PRED_LEN, epochs=EPOCHS, batch_size=BA
             all_results.append({
                 'region': r_name, 'horizon': f'T+{h}',
                 'RMSE': rmse, 'MAE': mae, 'R2': r2, 'MAPE': mape,
-                'n_test': len(a_arr)
+                'n_test': len(a_arr), 'train_time': round(dt, 2)
             })
 
     # Summary
@@ -287,7 +289,12 @@ def train_model(seq_len=SEQ_LEN, pred_len=PRED_LEN, epochs=EPOCHS, batch_size=BA
             agg = lambda key: sum(r[key]*r['n_test'] for r in hr) / total
             print(f"  T+{h:<3d}  RMSE={agg('RMSE'):.2f}  MAE={agg('MAE'):.2f}  "
                   f"R2={agg('R2')*100:.2f}%  MAPE={agg('MAPE'):.2f}%")
+
+    total_time = time.time() - total_start
+    print(f"\n  Total training time: {total_time:.1f}s ({total_time/60:.1f}min)")
     print("=" * 70)
+
+    return all_results, total_time
 
 
 if __name__ == '__main__':

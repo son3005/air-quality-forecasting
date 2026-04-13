@@ -338,7 +338,8 @@ def train_region(region_name, region_sids, data, num_features, horizon_h):
 
     best_val = float('inf')
     patience_cnt = 0
-    model_path = f'models_saved/xlinear_{region_name}_t{horizon_h}.pth'
+    save_dir = os.path.join('models_saved', BLOCK, 'XLinear')
+    model_path = os.path.join(save_dir, f'{region_name}_t{horizon_h}.pth')
 
     for epoch in range(EPOCHS):
         t0 = time.time()
@@ -371,7 +372,7 @@ def train_region(region_name, region_sids, data, num_features, horizon_h):
 
         if vl < best_val:
             best_val = vl
-            os.makedirs('models_saved', exist_ok=True)
+            os.makedirs(save_dir, exist_ok=True)
             torch.save(model.state_dict(), model_path)
             patience_cnt = 0
         else:
@@ -400,7 +401,7 @@ def train_region(region_name, region_sids, data, num_features, horizon_h):
 
     return {'region': region_name, 'horizon': f'T+{horizon_h}',
             'RMSE': rmse, 'MAE': mae, 'R2': r2, 'MAPE': mape,
-            'n_test': len(y_true)}
+            'n_test': len(y_true), 'train_time': round(time.time() - t0, 2)}
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -411,6 +412,8 @@ def run_xlinear():
     print("=" * 70)
     print(f"  XLinear Pipeline — 12 Stations | Block: {BLOCK}")
     print("=" * 70)
+
+    total_start = time.time()
 
     all_results = []
     for horizon_h in HORIZONS:
@@ -442,7 +445,12 @@ def run_xlinear():
                   f"MAE={sum(r['MAE']*r['n_test'] for r in hr)/total:.2f}  "
                   f"R2={sum(r['R2']*r['n_test'] for r in hr)/total*100:.2f}%  "
                   f"MAPE={sum(r['MAPE']*r['n_test'] for r in hr)/total:.2f}%")
+
+    total_time = time.time() - total_start
+    print(f"\n  Total training time: {total_time:.1f}s ({total_time/60:.1f}min)")
     print("=" * 70)
+
+    return all_results, total_time
 
 
 if __name__ == '__main__':

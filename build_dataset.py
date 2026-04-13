@@ -128,10 +128,12 @@ def create_pm25_lag_features(df: pd.DataFrame) -> pd.DataFrame:
 # =============================================================================
 
 def step1_preprocess(station_id: int):
+    # Lấy thông tin địa lý của trạm từ info.csv
     province = info_df.loc[station_id, 'province']
     district = info_df.loc[station_id, 'district']
     location = f"{province}_{district}"
     
+    # Đọc dữ liệu thô, chuyển đổi timestamp, sắp xếp và chọn cột cần thiết
     df_air = pd.read_csv(f'{AIR_DIR}/air_{station_id}.csv')
     df_air['timestamp_local'] = pd.to_datetime(df_air['timestamp_local'])
     df_air = df_air.sort_values('timestamp_local').reset_index(drop=True)
@@ -143,9 +145,11 @@ def step1_preprocess(station_id: int):
     df_wth['timestamp_local'] = pd.to_datetime(df_wth['timestamp_local'])
     df_wth = df_wth.sort_values('timestamp_local').reset_index(drop=True)
 
+    # Chỉ giữ lại cột thời gian và các cột thời tiết đã map tên
     df = pd.merge(df_air, df_wth, on='timestamp_local', how='outer')
     df = df.drop_duplicates(subset=['timestamp_local'], keep='first')
 
+    # Tạo các đặc trưng mới, phát hiện và xử lý dữ liệu lỗi, sau đó tạo các feature kỹ thuật và lag features
     df = create_wind_components(df)
     df = validate_time_range(df, location)
     df = detect_frozen_data(df)
@@ -164,16 +168,18 @@ def step1_preprocess(station_id: int):
     df['station_id'] = station_id
     df['province']   = province
     df['district']   = district
-    
+    # Chỉ giữ lại các cột cuối cùng cần thiết cho bước tiếp theo, đồng thời reset index để timestamp trở thành cột riêng
     keep_cols = [c for c in FINAL_COLS if c in df.columns]
     df = df[keep_cols].reset_index(names='timestamp')
     
+    # Lưu kết quả đã làm sạch cho bước tiếp theo, đồng thời trả về số lượng mẫu và đường dẫn file đã lưu
     out_path = f'{CLEAN_DIR}/clean_station_{station_id}.csv'
     df.to_csv(out_path, index=False)
     return len(df), out_path
 
 
 def step2_normalize(station_id: int):
+    # Đọc dữ liệu đã làm sạch, thiết lập timestamp làm index, và tạo mặt nạ cho tập Train dựa trên thời gian
     path = f'{CLEAN_DIR}/clean_station_{station_id}.csv'
     df = pd.read_csv(path, parse_dates=['timestamp'])
     df = df.set_index('timestamp').sort_index()
@@ -181,13 +187,14 @@ def step2_normalize(station_id: int):
     train_mask = df.index <= TRAIN_END
     df_out = df.copy()
     scalers = {}
-
+    # Tạo các thành phần gió sin/cos nếu có cột wind_dir, sau đó loại bỏ cột gốc wind_dir
     if 'wind_dir' in df.columns:
         rad = np.deg2rad(df['wind_dir'])
         df_out['wind_sin'] = np.sin(rad)
         df_out['wind_cos'] = np.cos(rad)
         df_out.drop(columns=['wind_dir'], inplace=True)
 
+    # Hàm phụ để fit scaler trên tập Train và transform toàn bộ dữ liệu cho cột cụ thể
     def _fit_transform(col, scaler, df_in):
         vals = df_in[[col]].values
         train_vals = df_in.loc[train_mask, [col]].values
@@ -195,20 +202,21 @@ def step2_normalize(station_id: int):
         scaler.fit(train_vals)
         return scaler.transform(vals).flatten()
 
+    # Áp dụng các chiến lược chuẩn hóa khác nhau cho từng nhóm cột, đồng thời lưu thông tin scaler đã sử dụng để có thể áp dụng lại cho dữ liệu mới sau này
     for col in LOG_STANDARD:
         if col in df_out.columns:
             df_out[col] = np.log1p(df_out[col].clip(lower=0))
             sc = StandardScaler()
             df_out[col] = _fit_transform(col, sc, df_out)
             scalers[col] = ('log1p+standard', sc)
-
+    # Target variable pm25 cũng được log1p nhưng dùng RobustScaler để giảm ảnh hưởng của outliers, đồng thời không clip để giữ nguyên giá trị gốc (vì đã có cột is_extreme_pm25_1h_ago hỗ trợ)
     for col in LOG_ROBUST + LOG_ROBUST_ONLY_NO_CLIP + PM25_LAG_COLS + PM25_ROLL_MEAN:
         if col in df_out.columns:
             df_out[col] = np.log1p(df_out[col].clip(lower=0))
             sc = RobustScaler()
             df_out[col] = _fit_transform(col, sc, df_out)
             scalers[col] = ('log1p+robust', sc)
-
+    # Các cột có giá trị phân phối rất lệch hoặc có nhiều outliers sẽ được clip ở một quantile cao (như 99% hoặc 99.5%) trước khi log-transform và scale, để giảm ảnh hưởng của các giá trị cực đoan mà không loại bỏ hoàn toàn chúng
     for col in CLIP_LOG_MINMAX:
         if col in df_out.columns:
             q99 = df_out.loc[train_mask, col].quantile(0.99) if train_mask.sum() > 0 else df_out[col].quantile(0.99)
@@ -216,7 +224,7 @@ def step2_normalize(station_id: int):
             sc = MinMaxScaler()
             df_out[col] = _fit_transform(col, sc, df_out)
             scalers[col] = ('clip_log1p+minmax', sc, q99)
-
+    # Các cột có nhiều outliers nhưng vẫn muốn giữ nguyên giá trị gốc (như pm10, no2) sẽ được clip ở một quantile cao trước khi log-transform và scale bằng RobustScaler, để giảm ảnh hưởng của outliers mà không loại bỏ hoàn toàn chúng
     for col in CLIP_LOG_ROBUST:
         if col in df_out.columns:
             q995 = df_out.loc[train_mask, col].quantile(0.995) if train_mask.sum() > 0 else df_out[col].quantile(0.995)
@@ -224,19 +232,19 @@ def step2_normalize(station_id: int):
             sc = RobustScaler()
             df_out[col] = _fit_transform(col, sc, df_out)
             scalers[col] = ('clip_p995_log1p+robust', sc, q995)
-
+    # Các cột còn lại có thể có outliers nhưng không muốn log-transform sẽ được scale bằng RobustScaler, để giảm ảnh hưởng của outliers mà không loại bỏ hoàn toàn chúng
     for col in ROBUST_ONLY + PM25_ROLL_STD:
         if col in df_out.columns:
             sc = RobustScaler()
             df_out[col] = _fit_transform(col, sc, df_out)
             scalers[col] = ('robust', sc)
-
+    # Các cột có phân phối gần chuẩn sẽ được scale bằng StandardScaler, để đưa chúng về cùng một thang đo với giả định phân phối chuẩn
     for col in STANDARD_ONLY:
         if col in df_out.columns:
             sc = StandardScaler()
             df_out[col] = _fit_transform(col, sc, df_out)
             scalers[col] = ('standard', sc)
-
+    # Các cột còn lại sẽ được scale về [0,1] bằng MinMaxScaler, để đưa chúng về cùng một thang đo mà không giả định phân phối nào
     for col in MINMAX_ONLY:
         if col in df_out.columns:
             sc = MinMaxScaler()
