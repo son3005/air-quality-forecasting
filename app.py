@@ -55,49 +55,37 @@ st.set_page_config(
 # ─────────────────────────────────────────────────────────────────────────────
 # PHẦN 3: CSS TÙY CHỈNH GIAO DIỆN
 # Nhiệm vụ : Ghi đè giao diện mặc định của Streamlit bằng CSS tùy chỉnh
-#            để tạo phong cách dark mode với hiệu ứng glassmorphism.
-# Thực hiện: Dùng st.markdown() với unsafe_allow_html=True để nhúng thẻ <style>.
-# Các thành phần CSS được định nghĩa:
-#   - nền toàn trang  : gradient tím đậm → xanh đậm
-#   - sidebar         : nền tối trong suốt + viền mờ bên phải
-#   - .main-title     : tiêu đề lớn với gradient màu chữ
-#   - .aqi-badge      : nhãn tròn hiển thị mức AQI (tốt / trung bình / nguy hiểm...)
-#   - .metric-card    : thẻ chỉ số KPI, có hiệu ứng nổi lên khi hover
-#   - .section-header : tiêu đề mỗi khu vực (lịch sử, dự báo, chú thích)
-#   - .forecast-card  : thẻ hiển thị giá trị dự báo từng mốc thời gian
-#   - .info-pill      : viên nhỏ hiển thị thông tin thêm (địa chỉ trạm, tọa độ)
-#   - Ghi đè Streamlit: đổi màu nhãn, selectbox, button cho khớp theme tối
+#            để tạo phong cách sáng, chuyên nghiệp, dễ đọc.
 # ─────────────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-/* Nền toàn trang: gradient tím → xanh đậm */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+
+/* Nền toàn trang: trắng sạch */
 [data-testid="stAppViewContainer"] {
-    background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+    background: #f8fafc;
 }
-/* Sidebar: nền tối trong suốt, viền mờ bên phải */
+/* Sidebar: nền xanh rất nhạt, viền phải */
 [data-testid="stSidebar"] {
-    background: rgba(15, 12, 41, 0.92);
-    border-right: 1px solid rgba(255,255,255,0.08);
+    background: #ffffff;
+    border-right: 1px solid #e2e8f0;
 }
 
-/* Tiêu đề chính: chữ gradient màu sắc */
+/* Tiêu đề chính */
 .main-title {
     font-family: 'Inter', sans-serif;
-    font-size: 2.6rem;
+    font-size: 2.4rem;
     font-weight: 800;
-    background: linear-gradient(90deg, #a78bfa, #60a5fa, #34d399);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    color: #1e293b;
     margin-bottom: 0.2rem;
 }
-/* Phụ đề nhỏ bên dưới tiêu đề */
 .sub-title {
-    color: rgba(203,213,225,0.7);
+    color: #64748b;
     font-size: 1rem;
     margin-bottom: 1.5rem;
 }
 
-/* Nhãn tròn hiển thị mức chất lượng không khí AQI */
+/* Nhãn tròn AQI */
 .aqi-badge {
     display: inline-block;
     padding: 6px 18px;
@@ -108,47 +96,43 @@ st.markdown("""
     text-transform: uppercase;
 }
 
-/* Thẻ chỉ số KPI (PM2.5, Nhiệt độ, Độ ẩm...) */
+/* Thẻ chỉ số KPI */
 .metric-card {
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.10);
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
     border-radius: 16px;
     padding: 20px 24px;
-    backdrop-filter: blur(12px);         /* hiệu ứng kính mờ */
-    transition: transform 0.2s ease, border-color 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
-/* Hiệu ứng nổi lên khi hover vào thẻ KPI */
 .metric-card:hover {
     transform: translateY(-3px);
-    border-color: rgba(167,139,250,0.4);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.10);
 }
-/* Nhãn mô tả bên trên giá trị */
 .metric-label {
     font-size: 0.75rem;
-    color: rgba(148,163,184,0.9);
+    color: #64748b;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     margin-bottom: 6px;
 }
-/* Giá trị số lớn chính giữa thẻ */
 .metric-value {
     font-size: 2rem;
     font-weight: 800;
-    color: #f1f5f9;
+    color: #1e293b;
     line-height: 1.1;
 }
-/* Đơn vị đo hiển thị bên dưới giá trị */
 .metric-unit {
     font-size: 0.85rem;
-    color: rgba(148,163,184,0.7);
+    color: #94a3b8;
     margin-top: 2px;
 }
 
-/* Tiêu đề phần nội dung (lịch sử, dự báo...) */
+/* Tiêu đề phần */
 .section-header {
     font-size: 1.15rem;
     font-weight: 700;
-    color: #e2e8f0;
+    color: #1e293b;
     margin-top: 1.5rem;
     margin-bottom: 0.6rem;
     display: flex;
@@ -156,43 +140,38 @@ st.markdown("""
     gap: 8px;
 }
 
-/* Thẻ dự báo từng mốc thời gian (t+1h, t+6h...) */
+/* Thẻ dự báo */
 .forecast-card {
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.09);
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
     border-radius: 14px;
     padding: 18px 20px;
     text-align: center;
-    backdrop-filter: blur(8px);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     transition: all 0.2s ease;
     cursor: pointer;
 }
-/* Hiệu ứng hover thẻ dự báo: viền xanh, nền nhạt */
 .forecast-card:hover {
-    border-color: rgba(96,165,250,0.5);
-    background: rgba(96,165,250,0.07);
+    border-color: #3b82f6;
+    box-shadow: 0 4px 12px rgba(59,130,246,0.12);
     transform: translateY(-2px);
 }
-/* Nhãn mốc thời gian (t+1h, t+6h...) */
 .forecast-hour {
     font-size: 0.78rem;
-    color: rgba(148,163,184,0.8);
+    color: #64748b;
     text-transform: uppercase;
     letter-spacing: 0.06em;
     margin-bottom: 8px;
 }
-/* Giá trị PM2.5 dự báo cỡ lớn */
 .forecast-value {
     font-size: 1.7rem;
     font-weight: 800;
-    color: #f1f5f9;
+    color: #1e293b;
 }
-/* Đơn vị μg/m³ bên dưới giá trị dự báo */
 .forecast-unit {
     font-size: 0.75rem;
-    color: rgba(148,163,184,0.6);
+    color: #94a3b8;
 }
-/* Nhãn mức AQI (Tốt / Trung bình / Không tốt...) */
 .forecast-label {
     font-size: 0.7rem;
     margin-top: 6px;
@@ -201,47 +180,43 @@ st.markdown("""
     text-transform: uppercase;
 }
 
-/* Viên nhỏ hiển thị thông tin trạm (địa danh, tọa độ) */
+/* Viên nhỏ thông tin trạm */
 .info-pill {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    background: rgba(255,255,255,0.06);
-    border: 1px solid rgba(255,255,255,0.1);
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
     border-radius: 999px;
     padding: 4px 14px;
     font-size: 0.8rem;
-    color: rgba(203,213,225,0.85);
+    color: #475569;
     margin-right: 8px;
     margin-bottom: 6px;
 }
 
-/* Ghi đè màu chữ tiêu đề mặc định của Streamlit → trắng sáng */
+/* Ghi đè Streamlit defaults cho light theme */
 h1, h2, h3, h4, h5, h6 {
-    color: #e2e8f0 !important;
+    color: #1e293b !important;
 }
-/* Ghi đè style nhãn của selectbox / sidebar → nhỏ, viết hoa, màu nhạt */
 label, .stSelectbox label, [data-testid="stSidebarContent"] label {
-    color: rgba(203,213,225,0.85) !important;
+    color: #475569 !important;
     font-size: 0.82rem !important;
     font-weight: 600 !important;
     letter-spacing: 0.05em !important;
     text-transform: uppercase !important;
 }
-/* Ghi đè nền và viền của ô selectbox → trong suốt, viền mờ */
 [data-testid="stSelectbox"] > div > div {
-    background: rgba(255,255,255,0.06) !important;
-    border: 1px solid rgba(255,255,255,0.12) !important;
+    background: #ffffff !important;
+    border: 1px solid #cbd5e1 !important;
     border-radius: 10px !important;
-    color: #f1f5f9 !important;
+    color: #1e293b !important;
 }
-/* Ghi đè màu slider → tím */
 [data-testid="stSlider"] {
-    color: #a78bfa !important;
+    color: #3b82f6 !important;
 }
-/* Ghi đè style nút bấm → gradient tím-xanh */
 .stButton > button {
-    background: linear-gradient(135deg, #6d28d9, #2563eb) !important;
+    background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
     border: none !important;
     border-radius: 10px !important;
     color: white !important;
@@ -250,13 +225,11 @@ label, .stSelectbox label, [data-testid="stSidebarContent"] label {
     padding: 0.5rem 1.5rem !important;
     transition: opacity 0.2s ease !important;
 }
-/* Hiệu ứng mờ nhẹ khi hover nút */
 .stButton > button:hover {
     opacity: 0.88 !important;
 }
-/* Đường kẻ ngang phân vùng → màu trắng mờ */
 hr {
-    border-color: rgba(255,255,255,0.08) !important;
+    border-color: #e2e8f0 !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -383,8 +356,8 @@ with st.sidebar:
     st.markdown("""
         <div style='text-align:center;padding: 12px 0 18px 0;'>
             <span style='font-size:2.5rem;'>🌫️</span><br>
-            <span style='font-size:1.05rem;font-weight:800;color:#a78bfa;letter-spacing:0.04em;'>AQF Demo</span><br>
-            <span style='font-size:0.72rem;color:rgba(148,163,184,0.7);'>Air Quality Forecasting</span>
+            <span style='font-size:1.05rem;font-weight:800;color:#2563eb;letter-spacing:0.04em;'>AQF Demo</span><br>
+            <span style='font-size:0.72rem;color:#64748b;'>Air Quality Forecasting</span>
         </div>
     """, unsafe_allow_html=True)
     st.markdown("---")
@@ -421,11 +394,11 @@ with st.sidebar:
     st.markdown("<div class='metric-label'>Thông tin trạm</div>", unsafe_allow_html=True)
     # Xác định cluster và trạng thái model
     if selected_station_id in CLUSTER_NORTH_APP:
-        cluster_badge = "<span style='color:#60a5fa;font-weight:700;'>🔵 Cluster BẮC · XGBoost North</span>"
+        cluster_badge = "<span style='color:#2563eb;font-weight:700;'>🔵 Cluster BẮC · XGBoost North</span>"
     elif selected_station_id in CLUSTER_SOUTH_APP:
-        cluster_badge = "<span style='color:#fb923c;font-weight:700;'>🟠 Cluster NAM · XGBoost South</span>"
+        cluster_badge = "<span style='color:#ea580c;font-weight:700;'>🟠 Cluster NAM · XGBoost South</span>"
     else:
-        cluster_badge = "<span style='color:#94a3b8;'>⚪ Không có model XGBoost</span>"
+        cluster_badge = "<span style='color:#64748b;'>⚪ Không có model XGBoost</span>"
     st.markdown(f"""
         <span class='info-pill'>📍 {selected_row['district']}</span>
         <span class='info-pill'>🏙 {selected_row['province']}</span><br>
@@ -433,27 +406,9 @@ with st.sidebar:
         <div style='margin-top:8px;font-size:0.75rem;'>{cluster_badge}</div>
     """, unsafe_allow_html=True)
 
-    st.markdown("---")
-
-    # Dropdown chọn chỉ số ô nhiễm để hiển thị trên biểu đồ lịch sử (24h)
-    # Người dùng có thể đổi giữa PM2.5, PM10, CO, O3, NO2, SO2
-    show_pollutant = st.selectbox(
-        "Chỉ số hiển thị (lịch sử)",
-        options=list(POLLUTANTS.keys()),
-        index=0,
-    )
-    pollutant_col = POLLUTANTS[show_pollutant]  # Tên cột CSV tương ứng
-
-    st.markdown("---")
-
-    # Mô tả ngắn về mục tiêu dự án
-    st.markdown("<div class='metric-label'>Về dự án</div>", unsafe_allow_html=True)
-    st.markdown("""
-        <div style='font-size:0.75rem;color:rgba(148,163,184,0.7);line-height:1.6;'>
-        Dự án dự báo chất lượng không khí sử dụng dữ liệu từ 16 trạm đo trên toàn quốc.
-        Mô hình dự báo PM2.5 với các mốc thời gian <b>t+1, t+6, t+12, t+24</b> giờ.
-        </div>
-    """, unsafe_allow_html=True)
+    # Mặc định hiển thị PM2.5 trên biểu đồ lịch sử
+    show_pollutant = "PM2.5 (μg/m³)"
+    pollutant_col = "pm25"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -463,7 +418,7 @@ with st.sidebar:
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Tiêu đề và phụ đề hiển thị ở đầu trang chính
-st.markdown("<div class='main-title'>🌫️ Air Quality Forecasting</div>", unsafe_allow_html=True)
+st.markdown("<div class='main-title'>🌫️ Dự báo chất lượng không khí</div>", unsafe_allow_html=True)
 st.markdown(
     f"<div class='sub-title'>Hệ thống giám sát và dự báo chất lượng không khí · "
     f"<b>{selected_row['district']}, {selected_row['province']}</b></div>",
@@ -523,11 +478,11 @@ kpi_card(col5, "Tốc độ gió",  f"{latest['wind_spd']:.1f}",  "m/s",   "🌬
 # Nhãn AQI tròn màu động + thời gian cập nhật cuối
 st.markdown(f"""
     <div style='margin-top:16px;margin-bottom:8px;'>
-        <span style='color:rgba(148,163,184,0.7);font-size:0.83rem;'>Trạng thái chất lượng không khí hiện tại: </span>
-        <span class='aqi-badge' style='background:{aqi_color}22;color:{aqi_color};border:1px solid {aqi_color}55;'>
+        <span style='color:#64748b;font-size:0.83rem;'>Trạng thái chất lượng không khí hiện tại: </span>
+        <span class='aqi-badge' style='background:{aqi_color}18;color:{aqi_color};border:1px solid {aqi_color}55;'>
             ● &nbsp;{aqi_label}
         </span>
-        <span style='color:rgba(148,163,184,0.55);font-size:0.78rem;margin-left:10px;'>
+        <span style='color:#94a3b8;font-size:0.78rem;margin-left:10px;'>
             Cập nhật lúc {latest['timestamp'].strftime('%H:%M %d/%m/%Y')}
         </span>
     </div>
@@ -568,9 +523,9 @@ fig.add_trace(
     go.Scatter(
         x=x_vals, y=y_vals,
         mode="lines",
-        line=dict(color="#a78bfa", width=2.5, shape="spline"),
-        fill="tozeroy",                          # tô từ đường xuống trục 0
-        fillcolor="rgba(167,139,250,0.12)",      # tím mờ
+        line=dict(color="#6366f1", width=2.5, shape="spline"),
+        fill="tozeroy",
+        fillcolor="rgba(99,102,241,0.08)",
         name=show_pollutant,
         hovertemplate="<b>%{x|%H:%M %d/%m}</b><br>" + show_pollutant + ": %{y:.1f}<extra></extra>",
     ),
@@ -590,9 +545,9 @@ fig.add_trace(
     go.Scatter(
         x=x_vals, y=hist_df["temp"],
         mode="lines",
-        line=dict(color="#60a5fa", width=2, shape="spline"),
+        line=dict(color="#3b82f6", width=2, shape="spline"),
         fill="tozeroy",
-        fillcolor="rgba(96,165,250,0.10)",
+        fillcolor="rgba(59,130,246,0.06)",
         name="Nhiệt độ (°C)",
         hovertemplate="<b>%{x|%H:%M %d/%m}</b><br>Nhiệt độ: %{y:.1f}°C<extra></extra>",
     ),
@@ -602,32 +557,30 @@ fig.add_trace(
 # Layout chung: nền trong suốt, chú thích nằm ngang phía trên, tooltip chung
 fig.update_layout(
     height=420,
-    paper_bgcolor="rgba(0,0,0,0)",
-    plot_bgcolor="rgba(0,0,0,0)",
-    font=dict(color="#94a3b8", family="Inter, sans-serif"),
+    paper_bgcolor="#ffffff",
+    plot_bgcolor="#ffffff",
+    font=dict(color="#475569", family="Inter, sans-serif"),
     legend=dict(
         orientation="h",
         yanchor="bottom", y=1.02,
         xanchor="right", x=1,
-        font=dict(size=11),
-        bgcolor="rgba(0,0,0,0)",
+        font=dict(size=11, color="#475569"),
+        bgcolor="rgba(255,255,255,0)",
     ),
     margin=dict(l=0, r=0, t=30, b=0),
-    hovermode="x unified",   # tooltip hiện cả 2 trace khi hover cùng trục X
+    hovermode="x unified",
 )
-# Định dạng chung cho cả 2 trục X và Y: lưới mờ, font nhỏ
 fig.update_xaxes(
-    showgrid=True, gridcolor="rgba(255,255,255,0.05)",
-    tickfont=dict(size=11), linecolor="rgba(255,255,255,0.1)",
+    showgrid=True, gridcolor="#f1f5f9",
+    tickfont=dict(size=11, color="#64748b"), linecolor="#e2e8f0",
 )
 fig.update_yaxes(
-    showgrid=True, gridcolor="rgba(255,255,255,0.05)",
-    tickfont=dict(size=11), linecolor="rgba(255,255,255,0.1)",
+    showgrid=True, gridcolor="#f1f5f9",
+    tickfont=dict(size=11, color="#64748b"), linecolor="#e2e8f0",
     zeroline=False,
 )
-# Gán nhãn trục Y riêng cho từng hàng subplot
-fig.update_yaxes(title_text=show_pollutant, title_font=dict(size=11), row=1, col=1)
-fig.update_yaxes(title_text="Nhiệt độ (°C)", title_font=dict(size=11), row=2, col=1)
+fig.update_yaxes(title_text=show_pollutant, title_font=dict(size=11, color="#475569"), row=1, col=1)
+fig.update_yaxes(title_text="Nhiệt độ (°C)", title_font=dict(size=11, color="#475569"), row=2, col=1)
 
 # Render biểu đồ ra trang (ẩn thanh công cụ plotly)
 st.plotly_chart(fig, width='stretch', config=dict(displayModeBar=False))
@@ -649,10 +602,10 @@ poll_cols  = st.columns(3)                 # 3 cột ngang bằng
 poll_items = list(POLLUTANTS.items())      # danh sách (tên hiển thị, tên cột) của 6 chỉ số
 
 # Màu đường và màu vùng tô cho từng chỉ số (theo thứ tự trong POLLUTANTS)
-LINE_COLORS = ["#a78bfa", "#60a5fa", "#34d399", "#fbbf24", "#f97316", "#ec4899"]
+LINE_COLORS = ["#6366f1", "#3b82f6", "#10b981", "#f59e0b", "#f97316", "#ec4899"]
 FILL_COLORS = [
-    "rgba(167,139,250,0.15)", "rgba(96,165,250,0.15)", "rgba(52,211,153,0.15)",
-    "rgba(251,191,36,0.15)",  "rgba(249,115,22,0.15)", "rgba(236,72,153,0.15)",
+    "rgba(99,102,241,0.08)", "rgba(59,130,246,0.08)", "rgba(16,185,129,0.08)",
+    "rgba(245,158,11,0.08)",  "rgba(249,115,22,0.08)", "rgba(236,72,153,0.08)",
 ]
 
 for i, (label, col_name) in enumerate(poll_items):
@@ -671,12 +624,12 @@ for i, (label, col_name) in enumerate(poll_items):
         ))
         fig_s.update_layout(
             height=130,
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="#ffffff",
+            plot_bgcolor="#ffffff",
             margin=dict(l=0, r=0, t=0, b=0),
             showlegend=False,
-            xaxis=dict(visible=False),   # ẩn trục X (không cần thấy nhãn thời gian)
-            yaxis=dict(showgrid=False, showticklabels=True, tickfont=dict(size=9), linecolor="rgba(0,0,0,0)"),
+            xaxis=dict(visible=False),
+            yaxis=dict(showgrid=False, showticklabels=True, tickfont=dict(size=9, color="#94a3b8"), linecolor="rgba(0,0,0,0)"),
         )
 
         # Tính delta giữa giờ mới nhất và giờ trước đó
@@ -688,8 +641,8 @@ for i, (label, col_name) in enumerate(poll_items):
         # Hiển thị tên chỉ số, giá trị hiện tại và mũi tên delta
         st.markdown(f"""
             <div style='margin-bottom:4px;'>
-                <span style='font-size:0.72rem;color:rgba(148,163,184,0.8);text-transform:uppercase;letter-spacing:0.06em;'>{label}</span><br>
-                <span style='font-size:1.3rem;font-weight:800;color:#f1f5f9;'>{current_val:.1f}</span>
+                <span style='font-size:0.72rem;color:#64748b;text-transform:uppercase;letter-spacing:0.06em;'>{label}</span><br>
+                <span style='font-size:1.3rem;font-weight:800;color:#1e293b;'>{current_val:.1f}</span>
                 <span style='font-size:0.78rem;color:{delta_color};margin-left:6px;'>{delta_icon} {abs(delta_val):.1f}</span>
             </div>
         """, unsafe_allow_html=True)
@@ -728,7 +681,7 @@ if has_model:
         forecasts = predict_all_horizons(selected_station_id, df, tuple(horizons))
     region_label = "North" if selected_station_id in CLUSTER_NORTH_APP else "South"
     st.markdown(f"""
-        <div style='font-size:0.8rem;color:rgba(148,163,184,0.75);margin-bottom:12px;'>
+        <div style='font-size:0.8rem;color:#64748b;margin-bottom:12px;'>
         🤖 <b>Mô hình:</b> XGBoost block7 · Cluster <b>{region_label}</b> ·
         Dự báo dựa trên {len(df)} điểm dữ liệu lịch sử
         </div>
@@ -737,7 +690,7 @@ else:
     # Trạm không có model → fallback hiển thị giá trị hiện tại cho tất cả mốc
     forecasts = {h: latest_pm25 for h in horizons}
     st.markdown("""
-        <div style='font-size:0.82rem;color:rgba(251,191,36,0.8);margin-bottom:16px;'>
+        <div style='font-size:0.82rem;color:#d97706;margin-bottom:16px;'>
         ⚠️ <i>Trạm này không có mô hình XGBoost. Hiển thị giá trị hiện tại làm tham chiếu.</i>
         </div>
     """, unsafe_allow_html=True)
@@ -751,30 +704,16 @@ label_map = {
     24: ("t+24h", "Dài hạn"),
 }
 
-# A. Radio button chọn mốc dự báo – mốc được chọn sẽ làm nổi bật thẻ tương ứng
-selected_horizon = st.radio(
-    "Chọn mốc thời gian dự báo",
-    options=horizons,
-    format_func=lambda h: label_map[h][0],
-    horizontal=True,
-    label_visibility="visible",
-)
-
-# B. 5 thẻ dự báo (thêm t+3h) – thẻ khớp với selected_horizon có viền màu AQI dày hơn
+# 5 thẻ dự báo hiển thị đồng thời tất cả mốc thời gian
 fc_cols = st.columns(5)
 for i, h in enumerate(horizons):
     val              = forecasts[h]
     fc_color, fc_label = get_aqi_info(val)
     tag, range_label = label_map[h]
-    is_selected      = h == selected_horizon
 
-    # Thẻ được chọn: viền 2px màu AQI + nền nhạt theo màu AQI
-    # Thẻ không chọn: viền 1px trắng mờ + nền xám trong suốt
-    border_style = f"2px solid {fc_color}" if is_selected else "1px solid rgba(255,255,255,0.09)"
-    bg_style = (
-        f"rgba({int(fc_color[1:3],16)},{int(fc_color[3:5],16)},{int(fc_color[5:7],16)},0.08)"
-        if is_selected else "rgba(255,255,255,0.04)"
-    )
+    border_style = f"1px solid {fc_color}55"
+    bg_style = f"rgba({int(fc_color[1:3],16)},{int(fc_color[3:5],16)},{int(fc_color[5:7],16)},0.04)"
+
 
     fc_cols[i].markdown(f"""
         <div class='forecast-card' style='border:{border_style};background:{bg_style};'>
@@ -782,7 +721,7 @@ for i, h in enumerate(horizons):
             <div class='forecast-value' style='color:{fc_color};'>{val}</div>
             <div class='forecast-unit'>μg/m³</div>
             <div class='forecast-label' style='color:{fc_color};'>{fc_label}</div>
-            <div style='font-size:0.68rem;color:rgba(148,163,184,0.5);margin-top:4px;'>{range_label}</div>
+            <div style='font-size:0.68rem;color:#94a3b8;margin-top:4px;'>{range_label}</div>
         </div>
     """, unsafe_allow_html=True)
 
@@ -804,9 +743,9 @@ fig_fc = go.Figure()
 fig_fc.add_trace(go.Scatter(
     x=all_times, y=all_pm25,
     mode="lines",
-    line=dict(color="#a78bfa", width=2.5, shape="spline"),
+    line=dict(color="#6366f1", width=2.5, shape="spline"),
     fill="tozeroy",
-    fillcolor="rgba(167,139,250,0.10)",
+    fillcolor="rgba(99,102,241,0.06)",
     name="Lịch sử (24h)",
     hovertemplate="<b>%{x|%H:%M %d/%m}</b><br>PM2.5: %{y:.1f} μg/m³<extra></extra>",
 ))
@@ -815,11 +754,11 @@ fig_fc.add_trace(go.Scatter(
 fig_fc.add_trace(go.Scatter(
     x=future_times, y=future_vals,
     mode="lines+markers",
-    line=dict(color="#60a5fa", width=2.5, dash="dot", shape="spline"),
+    line=dict(color="#3b82f6", width=2.5, dash="dot", shape="spline"),
     marker=dict(
         size=10,
-        color=[get_aqi_info(v)[0] for v in future_vals],   # màu điểm theo AQI
-        line=dict(color="white", width=2)                  # viền trắng điểm
+        color=[get_aqi_info(v)[0] for v in future_vals],
+        line=dict(color="white", width=2)
     ),
     name="Dự báo",
     hovertemplate="<b>%{x|%H:%M %d/%m}</b><br>PM2.5 (dự báo): %{y:.1f} μg/m³<extra></extra>",
@@ -828,15 +767,14 @@ fig_fc.add_trace(go.Scatter(
 # Đường dọc phân chia "Hiện tại" và "Tương lai"
 fig_fc.add_vline(
     x=future_base,
-    line_dash="dash", line_color="rgba(255,255,255,0.3)", line_width=1.5,
+    line_dash="dash", line_color="#94a3b8", line_width=1.5,
 )
-# Nhãn "Hiện tại" ở trên đường dọc phân chia
 fig_fc.add_annotation(
     x=future_base,
     y=max(all_pm25 + future_vals) * 1.05,
     text="Hiện tại", showarrow=False,
-    font=dict(color="rgba(255,255,255,0.5)", size=11),
-    bgcolor="rgba(0,0,0,0)",
+    font=dict(color="#64748b", size=11),
+    bgcolor="rgba(255,255,255,0)",
 )
 
 # Các đường ngưỡng AQI nằm ngang tham chiếu cho dễ đọc
@@ -846,19 +784,19 @@ for thr, lbl, clr in [(12, "Tốt", "#34d399"), (35.4, "TB", "#fbbf24"), (55.4, 
 # Layout biểu đồ dự báo: cùng phong cách dark mode
 fig_fc.update_layout(
     height=320,
-    paper_bgcolor="rgba(0,0,0,0)",
-    plot_bgcolor="rgba(0,0,0,0)",
-    font=dict(color="#94a3b8", family="Inter, sans-serif"),
+    paper_bgcolor="#ffffff",
+    plot_bgcolor="#ffffff",
+    font=dict(color="#475569", family="Inter, sans-serif"),
     legend=dict(
         orientation="h", yanchor="bottom", y=1.01, xanchor="right", x=1,
-        font=dict(size=11), bgcolor="rgba(0,0,0,0)",
+        font=dict(size=11, color="#475569"), bgcolor="rgba(255,255,255,0)",
     ),
     margin=dict(l=0, r=0, t=28, b=0),
     hovermode="x unified",
     yaxis_title="PM2.5 (μg/m³)",
 )
-fig_fc.update_xaxes(showgrid=True, gridcolor="rgba(255,255,255,0.05)", tickfont=dict(size=11))
-fig_fc.update_yaxes(showgrid=True, gridcolor="rgba(255,255,255,0.05)", tickfont=dict(size=11), zeroline=False)
+fig_fc.update_xaxes(showgrid=True, gridcolor="#f1f5f9", tickfont=dict(size=11, color="#64748b"))
+fig_fc.update_yaxes(showgrid=True, gridcolor="#f1f5f9", tickfont=dict(size=11, color="#64748b"), zeroline=False)
 
 st.plotly_chart(fig_fc, width='stretch', config=dict(displayModeBar=False))
 
@@ -912,7 +850,7 @@ for i, (lo, hi, color, lv, lv_en) in enumerate(AQI_BREAKPOINTS):
             <!-- Khoảng giá trị PM2.5 tương ứng -->
             <div style='
                 font-size:0.68rem;
-                color:rgba(148,163,184,0.7);
+                color:#94a3b8;
                 margin-top:4px;
                 white-space:nowrap;
             '>{lo}–{hi} μg/m³</div>
@@ -927,7 +865,7 @@ for i, (lo, hi, color, lv, lv_en) in enumerate(AQI_BREAKPOINTS):
 st.markdown("<br>", unsafe_allow_html=True)
 st.markdown("""
     <div style='text-align:center;padding:20px 0 8px 0;
-                font-size:0.72rem;color:rgba(148,163,184,0.4);'>
+                font-size:0.72rem;color:#94a3b8;'>
         Air Quality Forecasting Demo &nbsp;·&nbsp; Đồ án 2 - HK7 &nbsp;·&nbsp;
         Dữ liệu từ mạng lưới quan trắc quốc gia &nbsp;·&nbsp;
     </div>
