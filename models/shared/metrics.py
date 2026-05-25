@@ -11,14 +11,14 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 SCALER_DIR = 'data/normalized'
 
 
-def inverse_pm25(y_norm, station_id, scaler_dir=SCALER_DIR):
-    """Inverse transform PM2.5 từ normalized space về µg/m³."""
+def inverse_pollutant(y_norm, station_id, pollutant, scaler_dir=SCALER_DIR):
+    """Inverse transform a pollutant từ normalized space về không gian gốc."""
     scaler_path = os.path.join(scaler_dir, f'scalers_{station_id}.pkl')
     if not os.path.exists(scaler_path):
         return y_norm
     with open(scaler_path, 'rb') as f:
         scalers = pickle.load(f)
-    method_tuple = scalers.get('pm25')
+    method_tuple = scalers.get(pollutant)
     if not method_tuple:
         return y_norm
     method, sc = method_tuple[:2]
@@ -44,3 +44,23 @@ def get_metrics(y_true, y_pred):
         r2_score(y_true, y_pred),
         compute_mape(y_true, y_pred),
     )
+
+
+def get_per_pollutant_metrics(y_true, y_pred, pollutants=['pm25', 'pm10', 'co', 'o3', 'no2', 'so2']):
+    """
+    Tính metrics cho từng chất.
+    y_true, y_pred: numpy array shape (samples, num_stations * len(pollutants))
+    """
+    num_pols = len(pollutants)
+    num_stations = y_true.shape[1] // num_pols
+    
+    y_true_r = y_true.reshape(-1, num_stations, num_pols)
+    y_pred_r = y_pred.reshape(-1, num_stations, num_pols)
+    
+    results = {}
+    for i, pol in enumerate(pollutants):
+        yt = y_true_r[:, :, i].flatten()
+        yp = y_pred_r[:, :, i].flatten()
+        rmse, mae, r2, mape = get_metrics(yt, yp)
+        results[pol] = {'RMSE': rmse, 'MAE': mae, 'R2': r2, 'MAPE': mape}
+    return results

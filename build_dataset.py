@@ -72,11 +72,20 @@ FLAG_COLS = [
     'is_weekend_holiday', 'is_extreme_pm25_1h_ago'
 ]
 
-LAG_COLS = [
-    'pm25_lag_1', 'pm25_lag_3', 'pm25_lag_6', 'pm25_lag_12', 'pm25_lag_24',
-    'pm25_roll_mean_6', 'pm25_roll_mean_12', 'pm25_roll_std_6',
-    'hour_sin', 'hour_cos', 'month_sin', 'month_cos',
-]
+POLLUTANTS = ['pm25', 'pm10', 'co', 'o3', 'no2', 'so2']
+LAGS = [1, 3, 6, 12, 24]
+ROLLING_WINDOWS = [6, 12]
+
+LAG_COLS = []
+for pol in POLLUTANTS:
+    for k in LAGS:
+        LAG_COLS.append(f'{pol}_lag_{k}')
+    for w in ROLLING_WINDOWS:
+        LAG_COLS.append(f'{pol}_roll_mean_{w}')
+    LAG_COLS.append(f'{pol}_roll_std_6')
+
+LAG_COLS += ['hour_sin', 'hour_cos', 'month_sin', 'month_cos']
+
 META_COLS = ['station_id', 'province', 'district']
 FINAL_COLS = RAW_INPUT_COLS + ENGINEERED_COLS + FLAG_COLS + META_COLS + LAG_COLS
 
@@ -89,11 +98,21 @@ CLIP_LOG_ROBUST         = ['pm10', 'no2']
 ROBUST_ONLY             = ['o3', 'wind_spd', 'wind_gusts']
 STANDARD_ONLY           = ['temp', 'dewpt', 'thermal_stability', 'soil_temp_0_7', 'no2_so2_log_diff']
 MINMAX_ONLY             = ['rh', 'clouds', 'soil_moist_0_7']
-PM25_LAG_COLS           = ['pm25_lag_1', 'pm25_lag_3', 'pm25_lag_6', 'pm25_lag_12', 'pm25_lag_24']
-PM25_ROLL_MEAN          = ['pm25_roll_mean_6', 'pm25_roll_mean_12']
-PM25_ROLL_STD           = ['pm25_roll_std_6']
+
+# Gom nhóm chuẩn hóa cho các lag/rolling features theo phân bố của chất gốc
+LAG_LOG_STANDARD            = [f'co_lag_{k}' for k in LAGS] + [f'co_roll_mean_{w}' for w in ROLLING_WINDOWS]
+LAG_LOG_ROBUST              = [f'so2_lag_{k}' for k in LAGS] + [f'so2_roll_mean_{w}' for w in ROLLING_WINDOWS]
+LAG_LOG_ROBUST_ONLY_NO_CLIP = [f'pm25_lag_{k}' for k in LAGS] + [f'pm25_roll_mean_{w}' for w in ROLLING_WINDOWS]
+LAG_CLIP_LOG_ROBUST         = []
+for p in ['pm10', 'no2']:
+    LAG_CLIP_LOG_ROBUST += [f'{p}_lag_{k}' for k in LAGS] + [f'{p}_roll_mean_{w}' for w in ROLLING_WINDOWS]
+LAG_ROBUST_ONLY             = [f'o3_lag_{k}' for k in LAGS] + [f'o3_roll_mean_{w}' for w in ROLLING_WINDOWS]
+
+# Tất cả rolling std 6 dùng RobustScaler
+ROLL_STD_COLS               = [f'{pol}_roll_std_6' for pol in POLLUTANTS]
+
 # Features không scale, giữ nguyên giá trị
-NO_SCALE_COLS           = FLAG_COLS + META_COLS + ['timestamp', 'hour_sin', 'hour_cos', 'month_sin', 'month_cos']
+NO_SCALE_COLS               = FLAG_COLS + META_COLS + ['timestamp', 'hour_sin', 'hour_cos', 'month_sin', 'month_cos']
 
 # =============================================================================
 # 2. HELPER FUNCTIONS
@@ -101,15 +120,19 @@ NO_SCALE_COLS           = FLAG_COLS + META_COLS + ['timestamp', 'hour_sin', 'hou
 
 info_df = pd.read_csv(INFO_PATH).set_index('station')
 
-def create_pm25_lag_features(df: pd.DataFrame) -> pd.DataFrame:
+def create_pollutant_lag_features(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
-    pm25 = df['pm25']
-    for k in [1, 3, 6, 12, 24]:
-        df[f'pm25_lag_{k}'] = pm25.shift(k).bfill()
-    
-    df['pm25_roll_mean_6']  = pm25.rolling(window=6,  min_periods=1).mean()
-    df['pm25_roll_mean_12'] = pm25.rolling(window=12, min_periods=1).mean()
-    df['pm25_roll_std_6']   = pm25.rolling(window=6,  min_periods=2).std().fillna(0)
+    for pol in POLLUTANTS:
+        if pol not in df.columns:
+            continue
+        series = df[pol]
+        for k in LAGS:
+            df[f'{pol}_lag_{k}'] = series.shift(k).bfill()
+        
+        for w in ROLLING_WINDOWS:
+            df[f'{pol}_roll_mean_{w}'] = series.rolling(window=w, min_periods=1).mean()
+        
+        df[f'{pol}_roll_std_6'] = series.rolling(window=6, min_periods=2).std().fillna(0)
     
     if isinstance(df.index, pd.DatetimeIndex):
         hour, month = df.index.hour, df.index.month
@@ -163,7 +186,7 @@ def step1_preprocess(station_id: int):
     if 'pm25' in df.columns:
         df['is_extreme_pm25_1h_ago'] = (df['pm25'].shift(1).bfill() > 75.0).astype(int)
 
-    df = create_pm25_lag_features(df)
+    df = create_pollutant_lag_features(df)
     
     df['station_id'] = station_id
     df['province']   = province
@@ -203,14 +226,14 @@ def step2_normalize(station_id: int):
         return scaler.transform(vals).flatten()
 
     # Áp dụng các chiến lược chuẩn hóa khác nhau cho từng nhóm cột, đồng thời lưu thông tin scaler đã sử dụng để có thể áp dụng lại cho dữ liệu mới sau này
-    for col in LOG_STANDARD:
+    for col in LOG_STANDARD + LAG_LOG_STANDARD:
         if col in df_out.columns:
             df_out[col] = np.log1p(df_out[col].clip(lower=0))
             sc = StandardScaler()
             df_out[col] = _fit_transform(col, sc, df_out)
             scalers[col] = ('log1p+standard', sc)
     # Target variable pm25 cũng được log1p nhưng dùng RobustScaler để giảm ảnh hưởng của outliers, đồng thời không clip để giữ nguyên giá trị gốc (vì đã có cột is_extreme_pm25_1h_ago hỗ trợ)
-    for col in LOG_ROBUST + LOG_ROBUST_ONLY_NO_CLIP + PM25_LAG_COLS + PM25_ROLL_MEAN:
+    for col in LOG_ROBUST + LOG_ROBUST_ONLY_NO_CLIP + LAG_LOG_ROBUST + LAG_LOG_ROBUST_ONLY_NO_CLIP:
         if col in df_out.columns:
             df_out[col] = np.log1p(df_out[col].clip(lower=0))
             sc = RobustScaler()
@@ -225,7 +248,7 @@ def step2_normalize(station_id: int):
             df_out[col] = _fit_transform(col, sc, df_out)
             scalers[col] = ('clip_log1p+minmax', sc, q99)
     # Các cột có nhiều outliers nhưng vẫn muốn giữ nguyên giá trị gốc (như pm10, no2) sẽ được clip ở một quantile cao trước khi log-transform và scale bằng RobustScaler, để giảm ảnh hưởng của outliers mà không loại bỏ hoàn toàn chúng
-    for col in CLIP_LOG_ROBUST:
+    for col in CLIP_LOG_ROBUST + LAG_CLIP_LOG_ROBUST:
         if col in df_out.columns:
             q995 = df_out.loc[train_mask, col].quantile(0.995) if train_mask.sum() > 0 else df_out[col].quantile(0.995)
             df_out[col] = np.log1p(df_out[col].clip(lower=0, upper=q995))
@@ -233,7 +256,7 @@ def step2_normalize(station_id: int):
             df_out[col] = _fit_transform(col, sc, df_out)
             scalers[col] = ('clip_p995_log1p+robust', sc, q995)
     # Các cột còn lại có thể có outliers nhưng không muốn log-transform sẽ được scale bằng RobustScaler, để giảm ảnh hưởng của outliers mà không loại bỏ hoàn toàn chúng
-    for col in ROBUST_ONLY + PM25_ROLL_STD:
+    for col in ROBUST_ONLY + LAG_ROBUST_ONLY + ROLL_STD_COLS:
         if col in df_out.columns:
             sc = RobustScaler()
             df_out[col] = _fit_transform(col, sc, df_out)

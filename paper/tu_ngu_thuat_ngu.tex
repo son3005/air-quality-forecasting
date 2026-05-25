@@ -1,0 +1,129 @@
+\chapter*{DANH MỤC CÁC TỪ VIẾT TẮT VÀ THUẬT NGỮ}
+\addcontentsline{toc}{chapter}{DANH MỤC CÁC TỪ VIẾT TẮT VÀ THUẬT NGỮ}
+
+\begin{longtable}{p{4.2cm} p{10.3cm}}
+    \toprule
+    \textbf{Ký hiệu / Viết tắt} & \textbf{Ý nghĩa đầy đủ} \\
+    \midrule
+    \endfirsthead
+
+    AdamW & Biến thể của thuật toán tối ưu Adam có tích hợp cơ chế phân rã trọng số tách biệt \\
+    Aerosol sulfate & Các hạt sulfate ($SO_4^{2-}$) lơ lửng trong không khí, hình thành từ phản ứng của $SO_2$ với hơi nước, là nguồn tạo $PM_{2.5}$ thứ cấp \\
+    AI & Artificial Intelligence (Trí tuệ nhân tạo) \\
+    API & Application Programming Interface (Giao diện lập trình ứng dụng) --- cơ chế giao tiếp giữa các hệ thống phần mềm để trao đổi dữ liệu \\
+    AQI & Air Quality Index (Chỉ số chất lượng không khí) \\
+    ARIMA & Autoregressive Integrated Moving Average (Mô hình tự hồi quy tích hợp trung bình trượt) \\
+    AsymmetricHuberLoss & Hàm mất mát Huber bất đối xứng, phạt nặng hơn đối với sai số dự đoán thấp (under-prediction) so với dự đoán cao \\
+    Attention Pooling & Cơ chế tổng hợp chuỗi đặc trưng thành một vector đại diện duy nhất bằng trọng số attention \\
+    Batch size & Kích thước lô mẫu được nạp vào mô hình trong mỗi bước cập nhật tham số \\
+    Benchmark & Đối chuẩn --- quy trình đánh giá và so sánh hiệu suất của nhiều mô hình trên cùng tập dữ liệu và điều kiện thí nghiệm \\
+    BiLSTM & Bidirectional Long Short-Term Memory (LSTM hai chiều) \\
+    Block-days splitting & Chiến lược phân tách dữ liệu theo khối ngày tuần hoàn, đảm bảo mỗi tập con bao phủ mọi điều kiện khí tượng \\
+    Boosting & Phương pháp học kết hợp tuần tự, mỗi mô hình mới sửa sai số của mô hình trước đó \\
+    CART & Classification and Regression Trees (Cây phân loại và hồi quy) \\
+    CMAQ & Community Multiscale Air Quality Model (Mô hình chất lượng không khí đa quy mô) \\
+    CNN & Convolutional Neural Network (Mạng thần kinh tích chập) \\
+    CO & Carbon Monoxide (Khí carbon monoxit) \\
+    CombinedLoss & Hàm mất mát kết hợp có trọng số giữa MSE và HuberLoss, cân bằng giữa bám sát xu thế chính và kháng nhiễu ngoại lai \\
+    COPD & Chronic Obstructive Pulmonary Disease (Bệnh phổi tắc nghẽn mãn tính) \\
+    CosineAnnealingLR & Bộ lịch trình giảm tốc độ học theo hàm cosin \\
+    CUDA & Compute Unified Device Architecture --- kiến trúc tính toán song song trên GPU của NVIDIA \\
+    DL & Deep Learning (Học sâu) \\
+    Dropout & Kỹ thuật chính quy hóa vô hiệu hóa ngẫu nhiên một tỷ lệ nơ-ron trong quá trình huấn luyện \\
+    Dynamic Graph Builder & Module xây dựng ma trận kề động thay đổi theo thời gian, tích hợp khoảng cách địa lý và hướng gió thực tế \\
+    E-STGCN & Enhanced Spatio-Temporal Graph Convolutional Network \\
+    Early stopping & Cơ chế ngắt huấn luyện sớm khi hiệu suất trên tập kiểm định không cải thiện \\
+    ECMWF & European Centre for Medium-Range Weather Forecasts (Trung tâm Dự báo Khí tượng Hạn vừa Châu Âu) \\
+    Endogenous pathway & Đường dẫn nội sinh --- luồng xử lý tín hiệu trực tiếp của biến mục tiêu trong kiến trúc mạng nơ-ron đa phân luồng \\
+    Ensemble & Phương pháp kết hợp dự đoán từ nhiều mô hình thành phần nhằm nâng cao hiệu suất tổng thể \\
+    Epoch & Một vòng lặp hoàn chỉnh duyệt qua toàn bộ tập dữ liệu huấn luyện \\
+    ERA5 & Bộ dữ liệu tái phân tích khí tượng toàn cầu thế hệ thứ 5 của ECMWF, độ phân giải $0{,}25^\circ \times 0{,}25^\circ$ \\
+    Error accumulation & Sai số tích lũy --- hiện tượng sai số dự báo bị khuếch đại liên tục tỷ lệ thuận theo độ dài của tầm nhìn dự báo \\
+    Exogenous pathway & Đường dẫn ngoại sinh --- luồng phụ trợ khai thác các biến ngoại vi (thường là dữ liệu khí tượng) thông qua màng lọc hoặc cơ chế gating \\
+    Exogenous variables & Biến ngoại sinh --- các biến số độc lập đóng vai trò tương tác hỗ trợ quy trình dự báo (như nhiệt độ, hệ số gió) \\
+    Feature Engineering & Kỹ thuật xây dựng đặc trưng --- quá trình tạo các biến dẫn xuất từ dữ liệu thô nhằm nâng cao hiệu năng mô hình \\
+    Forecast horizon & Tầm nhìn dự báo --- khoảng thời gian tương lai (tính bằng số bước) mà mô hình cần phải dự toán kết quả \\
+    Gaussian kernel & Hàm nhân Gaussian --- hàm trọng số dạng chuông chuẩn dùng để chuyển đổi khoảng cách thành hệ số tương đồng \\
+    GCN & Graph Convolutional Network (Mạng tích chập đồ thị) \\
+    GELU & Gaussian Error Linear Unit (Hàm kích hoạt tuyến tính lỗi Gaussian) \\
+    GFS & Global Forecast System (Hệ thống dự báo toàn cầu) --- mô hình NWP do NOAA vận hành \\
+    Gradient Descent & Thuật toán tối ưu hóa dựa trên gradient, cập nhật tham số theo hướng giảm nhanh nhất của hàm mất mát \\
+    Grid Search & Phương pháp tìm kiếm dạng lưới dò quét toàn bộ tổ hợp siêu tham số khả dĩ \\
+    GRU & Gated Recurrent Unit (Đơn vị hồi quy có cổng) \\
+    Haversine & Công thức tính khoảng cách giữa hai điểm trên mặt cầu dựa trên tọa độ kinh vĩ độ \\
+    Hessian & Ma trận đạo hàm riêng bậc hai của hàm mục tiêu \\
+    HuberLoss & Hàm mất mát kết hợp ưu điểm của MAE và MSE, sử dụng MSE khi sai số nhỏ và MAE khi sai số lớn \\
+    IDW & Inverse Distance Weighting (Nội suy trọng số nghịch đảo khoảng cách) \\
+    Inference & Quá trình suy luận --- sử dụng mô hình đã huấn luyện để đưa ra dự báo trên dữ liệu mới \\
+    Interpretability & Khả năng diễn giải mô hình --- đặc tính cho phép bóc tách và giải nghĩa lý do hệ thống thuật toán đưa ra phán đoán dự báo \\
+    Inverse-transform & Phép biến đổi ngược từ không gian chuẩn hóa về đơn vị đo gốc \\
+    IoT & Internet of Things (Internet vạn vật) \\
+    IQR & Interquartile Range (Khoảng tứ phân vị) \\
+    iTransformer & Inverted Transformer --- kiến trúc Transformer đảo ngược chiều attention sang chiều biến \\
+    KNN & K-Nearest Neighbors (K láng giềng gần nhất) \\
+    Kriging & Phương pháp nội suy không gian dựa trên mô hình biến đổi bán phương sai, tối ưu cho dữ liệu địa thống kê \\
+    Lag & Phép trễ --- trích xuất giá trị tại các mốc thời gian trước đó ($t{-}1, t{-}3, \ldots$) để cung cấp ngữ cảnh lịch sử \\
+    LayerNorm & Layer Normalization --- kỹ thuật chuẩn hóa trên chiều đặc trưng trong mỗi mẫu, ổn định quá trình huấn luyện mạng sâu \\
+    LightGBM & Light Gradient Boosting Machine (Thuật toán tăng cường gradient nhẹ) \\
+    Linear projection & Phép chiếu tuyến tính --- phép nhân ma trận ánh xạ vector đặc trưng từ không gian $d_1$ chiều sang không gian $d_2$ chiều \\
+    Log1p & Phép biến đổi $\ln(1 + x)$, xử lý an toàn giá trị bằng không và giảm độ lệch phân phối \\
+    Lookback window & Cửa sổ quan sát --- đoạn dữ liệu lịch sử có độ dài $L$ bước thời gian được sử dụng làm đầu vào cho mô hình dự báo \\
+    LSTM & Long Short-Term Memory (Bộ nhớ dài hạn ngắn hạn) \\
+    MAE & Mean Absolute Error (Sai số tuyệt đối trung bình) \\
+    MAPE & Mean Absolute Percentage Error (Sai số phần trăm tuyệt đối trung bình) \\
+    MinMaxScaler & Phương pháp chuẩn hóa theo giá trị cực tiểu và cực đại, ánh xạ dữ liệu về khoảng $[0, 1]$ \\
+    ML & Machine Learning (Học máy) \\
+    MLP & Multi-Layer Perceptron (Perceptron đa tầng) \\
+    MSE & Mean Squared Error (Sai số bình phương trung bình) \\
+    Multi-horizon forecasting & Dự báo đa tầm nhìn --- bài toán ước lượng đồng thời giá trị tại nhiều bước thời gian tương lai ($T{+}1, T{+}3, \ldots, T{+}H$) \\
+    $NO_2$ & Nitrogen Dioxide (Khí nitơ dioxit) \\
+    Non-stationarity & Tính không dừng --- đặc điểm chuỗi thời gian có trung bình, phương sai hoặc cấu trúc tự tương quan thay đổi theo thời gian \\
+    NWP & Numerical Weather Prediction (Dự báo thời tiết bằng mô hình số trị) \\
+    $O_3$ & Ozone (Khí ozon) \\
+    One-hot encoding & Phương pháp mã hóa biến phân loại thành vector nhị phân, mỗi phần tử đại diện một giá trị danh mục \\
+    OPC & Optical Particle Counter (Bộ đếm hạt quang học) \\
+    Overfitting & Hiện tượng quá khớp khi mô hình học thuộc nhiễu thay vì quy luật tổng quát \\
+    Patience & Số epoch liên tiếp không cải thiện trước khi kích hoạt early stopping \\
+    Pearson & Hệ số tương quan tuyến tính Pearson --- thước đo mức độ tương quan tuyến tính giữa hai biến, giá trị trong $[-1, 1]$ \\
+    Pipeline & Đường ống xử lý --- chuỗi các bước xử lý dữ liệu hoặc mô hình được kết nối tuần tự, đầu ra bước trước là đầu vào bước sau \\
+    Plotly & Thư viện trực quan hóa dữ liệu tương tác dành cho Python \\
+    $PM_{10}$ & Particulate Matter 10 (Bụi có đường kính $\leq$ 10 $\mu m$) \\
+    $PM_{2.5}$ & Particulate Matter 2.5 (Bụi mịn có đường kính $\leq$ 2,5 $\mu m$) \\
+    PyTorch & Thư viện mã nguồn mở cho học sâu, hỗ trợ tính toán tensor trên GPU và cơ chế tự động vi phân \\
+    $R^2$ & Coefficient of Determination (Hệ số xác định) \\
+    Regularization & Chính quy hóa --- kỹ thuật thêm ràng buộc (L1, L2, Dropout) vào quá trình huấn luyện nhằm hạn chế Overfitting \\
+    ReLU & Rectified Linear Unit (Hàm kích hoạt tuyến tính chỉnh lưu) \\
+    RevIN & Reversible Instance Normalization (Chuẩn hóa mẫu khả nghịch) \\
+    RMSE & Root Mean Square Error (Sai số bình phương trung bình gốc) \\
+    RNN & Recurrent Neural Network (Mạng thần kinh hồi quy) \\
+    RobustScaler & Phương pháp chuẩn hóa sử dụng trung vị và khoảng tứ phân vị, ít nhạy cảm với ngoại lai \\
+    Rolling & Thống kê trượt --- tính toán trung bình, độ lệch chuẩn trên cửa sổ thời gian di chuyển \\
+    ROS & Reactive Oxygen Species (Các gốc oxy phản ứng) \\
+    SARIMA & Seasonal ARIMA (ARIMA có thành phần mùa vụ) \\
+    Seasonality & Tính mùa vụ --- thành phần biến động tuần hoàn với chu kỳ cố định (ngày, tuần, tháng, năm) trong chuỗi thời gian \\
+    Self-Attention & Cơ chế tự chú ý --- cho phép mỗi phần tử trong chuỗi đánh giá mức độ liên quan với mọi phần tử khác \\
+    Sequential processing & Xử lý tuần tự --- phương thức tính toán trong đó mỗi bước thời gian phải hoàn thành trước khi bước tiếp theo bắt đầu (đặc trưng của RNN) \\
+    Sigmoid & Hàm kích hoạt dạng chữ S ánh xạ đầu ra về khoảng $[0, 1]$ \\
+    Single-step forecasting & Dự báo đơn bước --- bài toán ước lượng giá trị tại một bước thời gian duy nhất ($T{+}1$) tiếp theo \\
+    $SO_2$ & Sulfur Dioxide (Khí lưu huỳnh dioxit) \\
+    SOA & Secondary Organic Aerosol (Sol khí hữu cơ thứ cấp) \\
+    Spatial dependency & Phụ thuộc không gian --- mức độ tương quan thuận giữa nồng độ $PM_{2.5}$ tại trạm quan trắc gốc và sự dịch chuyển gió từ trạm lân cận \\
+    Spatial resolution & Phân giải không gian --- mức độ chi tiết của lưới tọa độ biểu diễn dữ liệu (ví dụ: $0{,}25^\circ \times 0{,}25^\circ$ cho ERA5) \\
+    Split finding & Thuật toán tìm điểm phân tách tối ưu trên các nút của cây quyết định trong Gradient Boosting \\
+    ST-XLinear & Spatio-Temporal XLinear --- mô hình do đồ án đề xuất tích hợp đồ thị động vào XLinear \\
+    Stacking & Phương pháp kết hợp mô hình phi tuyến, sử dụng mô hình bậc hai để học cách tổng hợp đầu ra từ các mô hình thành phần \\
+    StandardScaler & Phương pháp chuẩn hóa theo trung bình và độ lệch chuẩn, đưa dữ liệu về phân phối chuẩn tắc \\
+    Streamlit & Nền tảng mã nguồn mở xây dựng giao diện Web cho ứng dụng khoa học dữ liệu \\
+    SVM & Support Vector Machine (Máy vector hỗ trợ) \\
+    Temperature inversion & Hiện tượng nghịch nhiệt --- trạng thái khí quyển trong đó nhiệt độ tăng theo độ cao (ngược quy luật), tạo lớp chắn ngăn chất ô nhiễm khuếch tán lên trên \\
+    Time series forecasting & Dự báo chuỗi thời gian --- bài toán ước lượng giá trị tương lai dựa trên chuỗi các quan sát được ghi nhận theo trình tự thời gian \\
+    VOCs & Volatile Organic Compounds (Các hợp chất hữu cơ dễ bay hơi) \\
+    Washout & Hiện tượng rửa trôi --- quá trình mưa cuốn theo các hạt bụi lơ lửng trong khí quyển xuống bề mặt đất, làm giảm nồng độ $PM_{2.5}$ \\
+    Weight decay & Hệ số phân rã trọng số trong thuật toán tối ưu, kiểm soát mức chính quy hóa L2 \\
+    WHO & World Health Organization (Tổ chức Y tế Thế giới) \\
+    Winsorization & Phương pháp xử lý ngoại lai bằng cách cắt xén giá trị tại một ngưỡng phân vị xác định \\
+    WRF & Weather Research and Forecasting Model (Mô hình nghiên cứu và dự báo thời tiết) \\
+    XGBoost & Extreme Gradient Boosting \\
+    XLinear & Mô hình dự báo chuỗi thời gian dựa trên MLP với cơ chế Gating Block cho biến ngoại sinh \\
+    \bottomrule
+\end{longtable}

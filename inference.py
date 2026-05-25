@@ -10,14 +10,15 @@ Nhiệm vụ:
   - Hỗ trợ cluster North / South theo định nghĩa dự án
 
 Sử dụng:
-  from inference import predict_pm25
-  result = predict_pm25(station_id=1, df_clean=df, horizon=1)
+  from inference import predict_pollutant
+  result = predict_pollutant(station_id=1, df_clean=df, horizon=1, target_pollutant="pm25")
 """
 
 import os, pickle, warnings
 import numpy as np
 import pandas as pd
 import streamlit as st
+import torch
 
 warnings.filterwarnings("ignore")
 
@@ -137,19 +138,20 @@ def load_scalers(station_id: int):
         return pickle.load(f)
 
 
-def inverse_pm25(y_norm: np.ndarray, station_id: int) -> np.ndarray:
+def inverse_prediction(y_norm: np.ndarray, station_id: int, target_pollutant: str) -> np.ndarray:
     """
-    Nhiệm vụ: Chuyển giá trị PM2.5 từ normalized space về μg/m³.
+    Nhiệm vụ: Chuyển giá trị từ normalized space về đơn vị gốc (μg/m³).
     Thực hiện:
         1. Load scaler tương ứng với trạm.
-        2. Inverse_transform bằng sklearn scaler.
-        3. Nếu method có 'log1p' thì áp dụng expm1 thêm.
-    Trả về: mảng numpy giá trị μg/m³
+        2. Lấy scaler của target_pollutant.
+        3. Inverse_transform bằng sklearn scaler.
+        4. Nếu method có 'log1p' thì áp dụng expm1 thêm.
+    Trả về: mảng numpy giá trị gốc
     """
     scalers = load_scalers(station_id)
     if scalers is None:
         return y_norm
-    method_tuple = scalers.get("pm25")
+    method_tuple = scalers.get(target_pollutant)
     if method_tuple is None:
         return y_norm
     method, sc = method_tuple[:2]
@@ -278,51 +280,200 @@ def build_inference_features(df_norm: pd.DataFrame, station_id: int, horizon: in
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# API chính: dự báo PM2.5 cho một trạm tại một mốc thời gian
+# Cấu hình siêu tham số cho các mô hình DL
 # ─────────────────────────────────────────────────────────────────────────────
-def predict_pm25(station_id: int, df_clean: pd.DataFrame, horizon: int) -> float:
+MODEL_CONFIG_ITRANSFORMER = {
+    1:  {'north': (64,  128, 4, 2), 'south': (64,  128, 4, 2)},
+    3:  {'north': (64,  128, 4, 2), 'south': (64,  128, 4, 2)},
+    6:  {'north': (64,  128, 4, 2), 'south': (128, 256, 4, 2)},
+    12: {'north': (128, 256, 4, 2), 'south': (128, 256, 4, 2)},
+    24: {'north': (128, 256, 4, 2), 'south': (128, 256, 4, 3)},
+}
+
+MODEL_CONFIG_MAMBA = {
+    1:  {'north': (64, 16, 4, 2), 'south': (64, 16, 4, 2)},
+    3:  {'north': (64, 16, 4, 2), 'south': (64, 16, 4, 2)},
+    6:  {'north': (64, 16, 4, 2), 'south': (64, 16, 4, 2)},
+    12: {'north': (64, 16, 4, 2), 'south': (64, 16, 4, 2)},
+    24: {'north': (64, 16, 4, 2), 'south': (64, 16, 4, 2)},
+}
+
+MODEL_CONFIG_TFT = {
+    1:  {'north': (64, 4), 'south': (64, 4)},
+    3:  {'north': (64, 4), 'south': (64, 4)},
+    6:  {'north': (64, 4), 'south': (64, 4)},
+    12: {'north': (64, 4), 'south': (64, 4)},
+    24: {'north': (64, 4), 'south': (64, 4)},
+}
+
+MODEL_CONFIG_PATCHTST = {
+    1:  {'north': (16, 8, 64, 4, 2, 128), 'south': (16, 8, 64, 4, 2, 128)},
+    3:  {'north': (16, 8, 64, 4, 2, 128), 'south': (16, 8, 64, 4, 2, 128)},
+    6:  {'north': (16, 8, 64, 4, 2, 128), 'south': (16, 8, 64, 4, 2, 128)},
+    12: {'north': (16, 8, 64, 4, 2, 128), 'south': (16, 8, 64, 4, 2, 128)},
+    24: {'north': (16, 8, 64, 4, 2, 128), 'south': (16, 8, 64, 4, 2, 128)},
+}
+
+def get_dl_model_config(model_type: str, horizon: int, region: str):
+    if model_type == "iTransformer":
+        return MODEL_CONFIG_ITRANSFORMER[horizon][region]
+    elif model_type == "Mamba":
+        return MODEL_CONFIG_MAMBA[horizon][region]
+    elif model_type == "TFT":
+        return MODEL_CONFIG_TFT[horizon][region]
+    elif model_type == "PatchTST":
+        return MODEL_CONFIG_PATCHTST[horizon][region]
+    elif model_type == "Toto-313M":
+        return MODEL_CONFIG_TFT[horizon][region] # Reusing TFT size or default config
+    raise ValueError(f"Unknown model config for {model_type}")
+
+@st.cache_resource
+def load_dl_model(model_type: str, region: str, horizon: int, enc_in: int):
     """
-    Nhiệm vụ: Trả về giá trị PM2.5 dự báo (μg/m³) cho trạm và mốc thời gian chỉ định.
-    QUAN TRỌNG: dùng df_norm (đã normalized) để build features, không dùng df_clean (raw).
-    Tham số:
-        station_id – ID của trạm đo (phải thuộc CLUSTER_NORTH hoặc CLUSTER_SOUTH)
-        df_clean   – không dùng trong inference, chỉ giữ tham số để tương thích API
-        horizon    – số giờ dự báo: 1, 3, 6, 12, hoặc 24
-    Thực hiện:
-        1. Load df_norm từ data/normalized/ (cached)
-        2. Xác định region (north/south)
-        3. Load model tương ứng (từ cache nếu đã gọi trước đó)
-        4. Build feature vector từ norm data
-        5. Predict (trả về giá trị normalized)
-        6. Inverse-transform về μg/m³
-    Trả về: float – giá trị PM2.5 dự báo (μg/m³), đã làm tròn 1 chữ số
+    Load và cache các mô hình Deep Learning (PyTorch).
+    """
+    save_dir = os.path.join(BASE_DIR, "models_saved", "block7", model_type)
+    save_path = os.path.join(save_dir, f"{region}_t{horizon}.pth")
+    if not os.path.exists(save_path):
+        raise FileNotFoundError(f"Không tìm thấy checkpoint mô hình: {save_path}")
+        
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    
+    if model_type == "iTransformer":
+        from models.iTransformer.model import iTransformer
+        d_model, d_ff, n_heads, e_layers = get_dl_model_config(model_type, horizon, region)
+        model = iTransformer(
+            seq_len=48, pred_len=1, enc_in=enc_in,
+            d_model=d_model, n_heads=n_heads, e_layers=e_layers, d_ff=d_ff,
+            dropout=0.15, use_norm=True
+        )
+    elif model_type == "Mamba":
+        from models.Mamba.model import MambaModel
+        d_model, d_state, d_conv, e_layers = get_dl_model_config(model_type, horizon, region)
+        model = MambaModel(
+            seq_len=48, pred_len=1, enc_in=enc_in,
+            d_model=d_model, d_state=d_state, d_conv=d_conv, e_layers=e_layers,
+            dropout=0.1, use_norm=True
+        )
+    elif model_type == "TFT":
+        from models.TFT.model import TFTModel
+        d_model, n_heads = get_dl_model_config(model_type, horizon, region)
+        model = TFTModel(
+            seq_len=48, pred_len=1, enc_in=enc_in,
+            d_model=d_model, n_heads=n_heads,
+            dropout=0.1, use_norm=True
+        )
+    elif model_type == "PatchTST":
+        from models.PatchTST.model import PatchTSTModel
+        patch_len, stride, d_model, n_heads, e_layers, d_ff = get_dl_model_config(model_type, horizon, region)
+        model = PatchTSTModel(
+            seq_len=48, pred_len=1, enc_in=enc_in,
+            patch_len=patch_len, stride=stride, d_model=d_model, n_heads=n_heads,
+            e_layers=e_layers, d_ff=d_ff,
+            dropout=0.1, use_norm=True
+        )
+    elif model_type == "Toto-313M":
+        from models.Toto.model import HFTotoModel
+        d_model, n_heads = get_dl_model_config(model_type, horizon, region)
+        model = HFTotoModel(
+            seq_len=48, pred_len=1, enc_in=enc_in,
+            model_name="DataDog/toto-313m", d_model=d_model,
+            use_norm=True
+        )
+    else:
+        raise ValueError(f"Unknown deep learning model: {model_type}")
+        
+    model.load_state_dict(torch.load(save_path, map_location=device, weights_only=True))
+    model.to(device)
+    model.eval()
+    return model
+
+# ─────────────────────────────────────────────────────────────────────────────
+# API chính: dự báo chất ô nhiễm cho một trạm tại một mốc thời gian
+# ─────────────────────────────────────────────────────────────────────────────
+def predict_pollutant(station_id: int, df_clean: pd.DataFrame, horizon: int, model_type: str = "XGBoost", target_pollutant: str = "pm25") -> float:
+    """
+    Nhiệm vụ: Trả về giá trị dự báo (μg/m³) cho trạm và mốc thời gian chỉ định.
+    QUAN TRỌNG: hỗ trợ cả XGBoost (truyền thống) và các model Deep Learning (PyTorch).
     """
     df_norm = load_norm_data(station_id)       # đã normalized, dùng cho feature engineering
     region  = get_region(station_id)
-    model   = load_xgb_model(region, horizon)
-    X       = build_inference_features(df_norm, station_id, horizon)
-    y_norm  = model.predict(X)                 # normalized space
-    y_inv   = inverse_pm25(y_norm, station_id) # μg/m³
-    return float(max(0.0, round(float(y_inv[0]), 1)))
+    
+    if model_type == "XGBoost":
+        if target_pollutant != "pm25":
+            raise ValueError("XGBoost currently only supports PM2.5 forecasting")
+        model   = load_xgb_model(region, horizon)
+        X       = build_inference_features(df_norm, station_id, horizon)
+        y_norm  = model.predict(X)                 # normalized space
+        y_inv   = inverse_prediction(y_norm, station_id, target_pollutant) # μg/m³
+        return float(max(0.0, round(float(y_inv[0]), 1)))
+        
+    # Xử lý các mô hình Deep Learning (PyTorch)
+    # Xác định các trạm thuộc cùng vùng (region)
+    from models.shared.dataset import EXCLUDE_COLS, PM25_COL
+    POLLUTANTS = ['pm25', 'pm10', 'co', 'o3', 'no2', 'so2']
+    if target_pollutant not in POLLUTANTS:
+        raise ValueError(f"Unknown target pollutant: {target_pollutant}")
+        
+    if region == "north":
+        sids = CLUSTER_NORTH
+    else:
+        sids = CLUSTER_SOUTH
+        
+    node_idx = sids.index(station_id)
+    num_nodes = len(sids)
+    pol_idx = POLLUTANTS.index(target_pollutant)
+    num_targets = num_nodes * len(POLLUTANTS)
+    
+    # Load 48 giờ gần nhất cho tất cả trạm trong region
+    dfs = [load_norm_data(sid) for sid in sids]
+    
+    features_list = []
+    pollutants_list = []
+    for df_node in dfs:
+        df_s = df_node.tail(48).reset_index(drop=True)
+        feat_cols = [c for c in df_s.columns if c not in EXCLUDE_COLS and c not in POLLUTANTS
+                     and df_s[c].dtype in ['float64', 'float32', 'int64', 'int32']]
+        features_list.append(df_s[feat_cols].fillna(0).values.astype(np.float32))
+        
+        # Lấy 6 chất ô nhiễm
+        pol_vals = df_s[POLLUTANTS].fillna(0).values.astype(np.float32) # (48, 6)
+        pollutants_list.append(pol_vals)
+        
+    # Nối mảng theo thứ tự: node0(p0..p5), node1(p0..p5), ...
+    # Nghĩa là cột là [sid1_pm25, sid1_pm10, ..., sid2_pm25, ...]
+    pollutants_matrix = np.concatenate(pollutants_list, axis=1)  # (48, N*6)
+    shared = features_list[0]  # (48, F)
+    x_data = np.concatenate([shared, pollutants_matrix], axis=1)  # (48, F + N*6)
+    num_variates = x_data.shape[1]
+    
+    # Load model DL
+    model = load_dl_model(model_type, region, horizon, num_variates)
+    
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    x_tensor = torch.tensor(x_data, dtype=torch.float32).unsqueeze(0).to(device)  # (1, 48, F + N*6)
+    
+    with torch.no_grad():
+        out = model(x_tensor)  # (1, 1, F + N*6)
+        preds = out[0, 0, -num_targets:].cpu().numpy()  # (N*6,)
+        preds_r = preds.reshape(num_nodes, len(POLLUTANTS)) # (N, 6)
+        y_norm = preds_r[node_idx, pol_idx]
+        y_inv = inverse_prediction(y_norm, station_id, target_pollutant)  # gốc
+        return float(max(0.0, round(float(y_inv), 1)))
 
 
 def predict_all_horizons(station_id: int, df_clean: pd.DataFrame,
-                         horizons: tuple = (1, 3, 6, 12, 24)) -> dict:
+                         horizons: tuple = (1, 3, 6, 12, 24), model_type: str = "XGBoost", target_pollutant: str = "pm25") -> dict:
     """
-    Nhiệm vụ: Dự báo PM2.5 cho nhiều mốc thời gian cùng lúc.
-    Tham số:
-        station_id – ID trạm đo
-        df_clean   – DataFrame dữ liệu trạm
-        horizons   – tuple các mốc dự báo (giờ), mặc định (1, 3, 6, 12, 24)
-    Trả về: dict {horizon_giờ: giá_trị_PM2.5_μg/m³}
-    Lỗi xử lý: nếu một mốc lỗi thì fallback = giá trị PM2.5 hiện tại
+    Nhiệm vụ: Dự báo chất ô nhiễm cho nhiều mốc thời gian cùng lúc bằng model được chọn.
     """
-    current_pm25 = float(df_clean["pm25"].iloc[-1])
+    current_val = float(df_clean[target_pollutant].iloc[-1])
     result = {}
     for h in horizons:
         try:
-            result[h] = predict_pm25(station_id, df_clean, h)
+            result[h] = predict_pollutant(station_id, df_clean, h, model_type, target_pollutant)
         except Exception as e:
-            # Fallback về giá trị hiện tại nếu model không chạy được
-            result[h] = round(current_pm25, 1)
+            # Fallback về giá trị hiện tại nếu model không chạy được hoặc báo lỗi
+            print(f"[Warning] Prediction failed for {target_pollutant} at horizon {h} with {model_type}: {e}")
+            result[h] = round(current_val, 1)
     return result

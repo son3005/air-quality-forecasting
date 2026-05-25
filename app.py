@@ -410,6 +410,20 @@ with st.sidebar:
     show_pollutant = "PM2.5 (μg/m³)"
     pollutant_col = "pm25"
 
+    st.markdown("---")
+    selected_model = st.selectbox(
+        "Chọn mô hình dự báo",
+        options=["XGBoost", "iTransformer", "Mamba", "TFT", "PatchTST", "Toto-313M"],
+        index=0,
+    )
+
+    selected_pollutant_label = st.selectbox(
+        "Chọn chất dự báo",
+        options=list(POLLUTANTS.keys()),
+        index=0,
+    )
+    target_pollutant_col = POLLUTANTS[selected_pollutant_label]
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PHẦN 6: TIÊU ĐỀ TRANG VÀ TẢI DỮ LIỆU
@@ -651,9 +665,9 @@ for i, (label, col_name) in enumerate(poll_items):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# PHẦN 10: KHU VỰC DỰ BÁO PM2.5 (XGBoost block7)
+# PHẦN 10: KHU VỰC DỰ BÁO CHẤT Ô NHIỄM
 # Nhiệm vụ : Cho phép người dùng chọn mốc thời gian dự báo (t+1h đến t+24h)
-#            và hiển thị giá trị PM2.5 dự báo thật từ mô hình XGBoost.
+#            và hiển thị giá trị dự báo thật từ mô hình được chọn.
 # Thực hiện:
 #   A. Gọi predict_all_horizons() từ inference.py:
 #        - Xác định cluster (north/south) theo station_id
@@ -666,32 +680,32 @@ for i, (label, col_name) in enumerate(poll_items):
 #       + Các đường ngưỡng AQI nằm ngang.
 # ─────────────────────────────────────────────────────────────────────────────
 st.markdown("---")
-st.markdown("<div class='section-header'>🔮 Dự báo PM2.5 · XGBoost</div>", unsafe_allow_html=True)
+st.markdown(f"<div class='section-header'>🔮 Dự báo {selected_pollutant_label} · {selected_model}</div>", unsafe_allow_html=True)
 
 # Danh sách mốc thời gian dự báo (giờ) – khớp với các model đã train
 horizons = [1, 3, 6, 12, 24]
 
-# Kiểm tra xem trạm đang chọn có model XGBoost không
+# Kiểm tra xem trạm đang chọn có model dự báo không
 has_model = selected_station_id in XGB_STATION_IDS
 
 if has_model:
-    # Gọi XGBoost inference: tự động chọn north/south model theo station_id
-    # Toàn bộ logic nằm trong inference.py (build_inference_features + predict + inverse)
-    with st.spinner("🤖 Đang chạy mô hình XGBoost dự báo…"):
-        forecasts = predict_all_horizons(selected_station_id, df, tuple(horizons))
+    # Gọi DL/XGBoost inference: tự động chọn north/south model theo station_id
+    with st.spinner(f"🤖 Đang chạy mô hình {selected_model} dự báo {target_pollutant_col}…"):
+        forecasts = predict_all_horizons(selected_station_id, df, tuple(horizons), model_type=selected_model, target_pollutant=target_pollutant_col)
     region_label = "North" if selected_station_id in CLUSTER_NORTH_APP else "South"
     st.markdown(f"""
         <div style='font-size:0.8rem;color:#64748b;margin-bottom:12px;'>
-        🤖 <b>Mô hình:</b> XGBoost block7 · Cluster <b>{region_label}</b> ·
+        🤖 <b>Mô hình:</b> {selected_model} block7 · Cluster <b>{region_label}</b> ·
         Dự báo dựa trên {len(df)} điểm dữ liệu lịch sử
         </div>
     """, unsafe_allow_html=True)
 else:
     # Trạm không có model → fallback hiển thị giá trị hiện tại cho tất cả mốc
-    forecasts = {h: latest_pm25 for h in horizons}
-    st.markdown("""
+    current_val = float(latest[target_pollutant_col])
+    forecasts = {h: current_val for h in horizons}
+    st.markdown(f"""
         <div style='font-size:0.82rem;color:#d97706;margin-bottom:16px;'>
-        ⚠️ <i>Trạm này không có mô hình XGBoost. Hiển thị giá trị hiện tại làm tham chiếu.</i>
+        ⚠️ <i>Trạm này không có mô hình {selected_model}. Hiển thị giá trị hiện tại làm tham chiếu.</i>
         </div>
     """, unsafe_allow_html=True)
 
@@ -730,7 +744,7 @@ st.markdown("<br>", unsafe_allow_html=True)
 
 # C. Chuẩn bị dữ liệu cho biểu đồ lịch sử + dự báo kết hợp
 all_times = list(hist_df["timestamp"])   # 24 mốc thời gian lịch sử
-all_pm25  = list(hist_df["pm25"])        # 24 giá trị PM2.5 lịch sử
+all_vals  = list(hist_df[target_pollutant_col])        # 24 giá trị lịch sử
 
 # Tính thời điểm tương lai: cộng thêm h giờ vào mốc mới nhất
 future_base  = hist_df["timestamp"].iloc[-1]
@@ -741,13 +755,13 @@ fig_fc = go.Figure()
 
 # Trace lịch sử 24h: đường tím đặc + tô vùng
 fig_fc.add_trace(go.Scatter(
-    x=all_times, y=all_pm25,
+    x=all_times, y=all_vals,
     mode="lines",
     line=dict(color="#6366f1", width=2.5, shape="spline"),
     fill="tozeroy",
     fillcolor="rgba(99,102,241,0.06)",
     name="Lịch sử (24h)",
-    hovertemplate="<b>%{x|%H:%M %d/%m}</b><br>PM2.5: %{y:.1f} μg/m³<extra></extra>",
+    hovertemplate="<b>%{x|%H:%M %d/%m}</b><br>" + selected_pollutant_label + ": %{y:.1f}<extra></extra>",
 ))
 
 # Trace dự báo: đường xanh nét đứt + điểm tròn màu AQI
@@ -757,11 +771,11 @@ fig_fc.add_trace(go.Scatter(
     line=dict(color="#3b82f6", width=2.5, dash="dot", shape="spline"),
     marker=dict(
         size=10,
-        color=[get_aqi_info(v)[0] for v in future_vals],
+        color=[get_aqi_info(v)[0] if target_pollutant_col == 'pm25' else "#3b82f6" for v in future_vals],
         line=dict(color="white", width=2)
     ),
     name="Dự báo",
-    hovertemplate="<b>%{x|%H:%M %d/%m}</b><br>PM2.5 (dự báo): %{y:.1f} μg/m³<extra></extra>",
+    hovertemplate="<b>%{x|%H:%M %d/%m}</b><br>" + selected_pollutant_label + " (dự báo): %{y:.1f}<extra></extra>",
 ))
 
 # Đường dọc phân chia "Hiện tại" và "Tương lai"
@@ -771,7 +785,7 @@ fig_fc.add_vline(
 )
 fig_fc.add_annotation(
     x=future_base,
-    y=max(all_pm25 + future_vals) * 1.05,
+    y=max(all_vals + future_vals) * 1.05,
     text="Hiện tại", showarrow=False,
     font=dict(color="#64748b", size=11),
     bgcolor="rgba(255,255,255,0)",

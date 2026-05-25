@@ -5,3 +5,7 @@ clean_data_all.csv
 __pycache__
 knowair_bthsa.npy
 adj_mat_knowair_bthsa.npy
+adj_mat_knowair_bthsa
+
+/agent/*
+.agents/
