@@ -348,12 +348,12 @@ def load_dl_model(model_type: str, region: str, horizon: int, enc_in: int):
             dropout=0.15, use_norm=True
         )
     elif model_type == "Mamba":
-        from models.Mamba.model import MambaModel
+        from models.Mamba.model import HFMambaModel
         d_model, d_state, d_conv, e_layers = get_dl_model_config(model_type, horizon, region)
-        model = MambaModel(
+        model = HFMambaModel(
             seq_len=48, pred_len=1, enc_in=enc_in,
             d_model=d_model, d_state=d_state, d_conv=d_conv, e_layers=e_layers,
-            dropout=0.1, use_norm=True
+            use_norm=True
         )
     elif model_type == "TFT":
         from models.TFT.model import TFTModel
@@ -364,9 +364,9 @@ def load_dl_model(model_type: str, region: str, horizon: int, enc_in: int):
             dropout=0.1, use_norm=True
         )
     elif model_type == "PatchTST":
-        from models.PatchTST.model import PatchTSTModel
+        from models.PatchTST.model import HFPatchTSTModel
         patch_len, stride, d_model, n_heads, e_layers, d_ff = get_dl_model_config(model_type, horizon, region)
-        model = PatchTSTModel(
+        model = HFPatchTSTModel(
             seq_len=48, pred_len=1, enc_in=enc_in,
             patch_len=patch_len, stride=stride, d_model=d_model, n_heads=n_heads,
             e_layers=e_layers, d_ff=d_ff,

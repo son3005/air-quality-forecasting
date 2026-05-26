@@ -5,19 +5,46 @@ Common metrics + inverse transform utilities dùng chung cho tất cả pipeline
 """
 import os
 import pickle
+import sys
+import types
 import numpy as np
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+
+# Monkeypatch for transformers to support torch.distributed.tensor.device_mesh on Windows/PyTorch 2.4.1
+try:
+    import torch.distributed.tensor
+    if 'torch.distributed.tensor.device_mesh' not in sys.modules:
+        m = types.ModuleType('torch.distributed.tensor.device_mesh')
+        try:
+            from torch.distributed.device_mesh import DeviceMesh
+        except ImportError:
+            from torch.distributed.tensor.device_mesh import DeviceMesh
+        m.DeviceMesh = DeviceMesh
+        sys.modules['torch.distributed.tensor.device_mesh'] = m
+        if not hasattr(torch.distributed.tensor, 'device_mesh'):
+            torch.distributed.tensor.device_mesh = m
+except Exception:
+    pass
 
 SCALER_DIR = 'data/normalized'
 
 
+_SCALER_CACHE = {}
+
+
 def inverse_pollutant(y_norm, station_id, pollutant, scaler_dir=SCALER_DIR):
     """Inverse transform a pollutant từ normalized space về không gian gốc."""
-    scaler_path = os.path.join(scaler_dir, f'scalers_{station_id}.pkl')
-    if not os.path.exists(scaler_path):
-        return y_norm
-    with open(scaler_path, 'rb') as f:
-        scalers = pickle.load(f)
+    cache_key = (station_id, scaler_dir)
+    if cache_key in _SCALER_CACHE:
+        scalers = _SCALER_CACHE[cache_key]
+    else:
+        scaler_path = os.path.join(scaler_dir, f'scalers_{station_id}.pkl')
+        if not os.path.exists(scaler_path):
+            return y_norm
+        with open(scaler_path, 'rb') as f:
+            scalers = pickle.load(f)
+        _SCALER_CACHE[cache_key] = scalers
+        
     method_tuple = scalers.get(pollutant)
     if not method_tuple:
         return y_norm

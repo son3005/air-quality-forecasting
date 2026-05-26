@@ -25,8 +25,8 @@ class HFMambaModel(nn.Module):
         # Note: Mamba is optimized for CUDA. If you encounter issues on CPU
         # with the official `mamba_ssm`, the transformers fallback will be used.
         config = MambaConfig(
-            d_model=d_model,
-            n_layer=e_layers,
+            hidden_size=d_model,
+            num_hidden_layers=e_layers,
             vocab_size=1, # Not used since we pass inputs_embeds
             state_size=d_state,
             conv_kernel=d_conv

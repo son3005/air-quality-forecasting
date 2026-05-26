@@ -26,12 +26,12 @@ REGIONS = {
     'south': [7, 18, 24, 30, 31, 32],
 }
 POLLUTANTS = ['pm25', 'pm10', 'co', 'o3', 'no2', 'so2']
-BLOCK = 'block7'
+BLOCK = 'block30'
 DATA_DIR = f'data/split/{BLOCK}'
 SEQ_LEN = 48
-HORIZONS = [1]
+HORIZONS = [1, 3, 6, 12, 24]
 BATCH_SIZE = 64
-EPOCHS = 2
+EPOCHS = 35
 LR = 1e-3
 PATIENCE = 10
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -158,6 +158,7 @@ def run():
                 # Validation
                 model.eval()
                 vlosses = []
+                all_preds, all_trues = [], []
                 with torch.no_grad():
                     for bx, by in val_loader:
                         bx = bx.to(DEVICE, non_blocking=True)
@@ -165,10 +166,51 @@ def run():
                         out = model(bx)
                         preds = out[:, 0, -num_targets:]
                         vlosses.append(criterion(preds, by).item())
+                        all_preds.append(preds.cpu().numpy())
+                        all_trues.append(by.cpu().numpy())
 
                 tl, vl = np.mean(losses), np.mean(vlosses)
                 dt = time.time() - t0
-                print(f"    Ep {epoch+1:02d}/{EPOCHS} | T: {tl:.4f} | V: {vl:.4f} | {dt:.1f}s")
+                
+                # Inverse transform on Val to get metrics
+                y_pred_val = np.concatenate(all_preds, axis=0)
+                y_true_val = np.concatenate(all_trues, axis=0)
+                
+                preds_r = y_pred_val.reshape(-1, num_nodes, len(POLLUTANTS))
+                trues_r = y_true_val.reshape(-1, num_nodes, len(POLLUTANTS))
+                batch_preds_inv = np.zeros_like(preds_r)
+                batch_trues_inv = np.zeros_like(trues_r)
+                
+                for node_idx, sid in enumerate(sids):
+                    for p_idx, pol in enumerate(POLLUTANTS):
+                        batch_preds_inv[:, node_idx, p_idx] = inverse_pollutant(preds_r[:, node_idx, p_idx], sid, pol)
+                        batch_trues_inv[:, node_idx, p_idx] = inverse_pollutant(trues_r[:, node_idx, p_idx], sid, pol)
+                
+                val_metrics = get_per_pollutant_metrics(batch_trues_inv.reshape(-1, num_targets), 
+                                                        batch_preds_inv.reshape(-1, num_targets), 
+                                                        POLLUTANTS)
+                pm25_val = val_metrics['pm25']
+                
+                print(f"    Ep {epoch+1:02d}/{EPOCHS} | T: {tl:.4f} | V: {vl:.4f} | PM2.5 RMSE: {pm25_val['RMSE']:.2f}, R2: {pm25_val['R2']*100:.2f}% | {dt:.1f}s")
+                
+                # Save history
+                history_path = os.path.join(save_dir, f'{r_name}_t{h}_history.csv')
+                hist_record = {
+                    'epoch': epoch + 1, 'train_loss': tl, 'val_loss': vl, 'time': dt
+                }
+                for pol in POLLUTANTS:
+                    m = val_metrics[pol]
+                    hist_record[f'{pol}_rmse'] = m['RMSE']
+                    hist_record[f'{pol}_mae'] = m['MAE']
+                    hist_record[f'{pol}_r2'] = m['R2']
+                    hist_record[f'{pol}_mape'] = m['MAPE']
+                
+                # Append to file or create new
+                df_hist = pd.DataFrame([hist_record])
+                if epoch == 0:
+                    df_hist.to_csv(history_path, index=False)
+                else:
+                    df_hist.to_csv(history_path, mode='a', header=False, index=False)
 
                 if vl < best_val:
                     best_val = vl

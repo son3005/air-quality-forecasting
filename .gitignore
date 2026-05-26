@@ -9,3 +9,5 @@ adj_mat_knowair_bthsa
 
 /agent/*
 .agents/
+/.venv-wsl/*
+.venv-wsl/
